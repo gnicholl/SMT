@@ -84,8 +84,9 @@ IBM1 = function(e,f,maxiter=30,eps=0.01,sparse=FALSE) {
 
       # update count matrices
       tmp = t_e_f[u_e_words,u_f_words]
-      tmp = tmp/rowSums(  tmp %*% diag(f_wordfreq)  )
-      tmp = (tmp*as.vector(e_wordfreq)) %*% diag(f_wordfreq)
+      d = diag(f_wordfreq)
+      tmp = tmp/rowSums(  tmp %*% d  )
+      tmp = (tmp*as.vector(e_wordfreq)) %*% d
       c_e_f[u_e_words,u_f_words] = c_e_f[u_e_words,u_f_words] + tmp
     }
 
