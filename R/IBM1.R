@@ -1,7 +1,40 @@
 
 
-
+#' IBM1 Model
+#'
+#' The simplest SMT model from Brown et al. (1993)
+#' @param e vector of sentences in language we want to translate to
+#' @param f vector of sentences in language we want to translate from
+#' @param maxiter max number of EM iterations allowed
+#' @param eps convergence criteria for perplexity
+#' @param sparse If FALSE (default), use base R matrices. If TRUE, use sparseMatrix from the Matrix package.
+#' @return
+#'    \item{tmatrix}{Matrix of translation probabilities (cols are words from e, rows are words from f). If sparse=TRUE, tmatrix will be a sparseMatrix from the Matrix package, and will generally take up substantially less memory.}
+#'    \item{numiter}{Number of iterations}
+#'    \item{maxiter}{As above}
+#'    \item{eps}{As above}
+#'    \item{converged}{TRUE if algorithm stopped once eps criteria met. FALSE otherwise.}
+#'    \item{perplexity}{Final likelihood/perplexity value.}
+#'    \item{time_elapsed}{Time in minutes the algorithm ran for.}
+#' @examples
+#' # download english-french sentence pairs
+#' temp = tempfile()
+#' download.file("http://www.manythings.org/anki/fra-eng.zip",temp);
+#' ENFR = readr::read_tsv(file=unz(temp,"fra.txt"),col_names=c("en","fr","details"));
+#' unlink(temp);
+#'
+#' # a bit of pre-processing
+#' e = tolower(stringr::str_squish(tm::removePunctuation(ENFR$en[1:200])));
+#' f = tolower(stringr::str_squish(tm::removePunctuation(ENFR$fr[1:200])));
+#'
+#' # try with and without sparseMatrix
+#' test1 = SMT::IBM1(e,f,maxiter=200,eps=0.01,sparse=FALSE);
+#' test2 = SMT::IBM1(e,f,maxiter=200,eps=0.01,sparse=TRUE);
+#' @import Matrix
+#' @export
 IBM1 = function(e,f,maxiter=30,eps=0.01,sparse=FALSE) {
+
+  start_time = Sys.time()
 
   # keep list of words in each sentence
   e_sentences = lapply(X=e,FUN=function(s) unlist(stringr::str_split(s, " ")))
@@ -35,13 +68,14 @@ IBM1 = function(e,f,maxiter=30,eps=0.01,sparse=FALSE) {
 
   } # if (sparse)
 
-
+  # initial setup message
+  time_elapsed = round(difftime(Sys.time(),start_time,units='min'),3)
+  print(paste0("initial setup ;;; time elapsed: ",time_elapsed,"min"))
 
   # EM algorithm
   iter = 1
   prev_perplex = 0
   total_perplex = Inf
-  start_time = Sys.time()
   while (iter<=maxiter & abs(total_perplex - prev_perplex)>eps) {
 
     for (i in 1:n) {
@@ -78,7 +112,23 @@ IBM1 = function(e,f,maxiter=30,eps=0.01,sparse=FALSE) {
 
   } # end while
 
-  return(t_e_f)
+  return(list(
+    "tmatrix"=t_e_f,
+    "numiter"=iter-1,
+    "maxiter"=maxiter,
+    "eps"=eps,
+    "converged"=abs(total_perplex - prev_perplex)<=eps,
+    "perplexity"=total_perplex,
+    "time_elapsed"=time_elapsed
+    ))
 
 } # end function IBM1
+
+
+
+
+
+
+
+
 
