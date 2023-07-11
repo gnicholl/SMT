@@ -1,2 +1,2 @@
 # SMT
-R for Statistical Machine Translation (SMT)
+Statistical Machine Translation (SMT) in R
