@@ -38,21 +38,32 @@
 #' @importFrom fastmatch fmatch
 #' @import Matrix
 #' @export
-IBM1 = function(e,f,maxiter=30,eps=0.01,sparse=FALSE,fmatch=FALSE) {
+IBM1 = function(e,f,maxiter=30,eps=0.01,sparse=FALSE,fmatch=FALSE,cl=NULL) {
 
   start_time = Sys.time()
 
   # some things we'll need repeatedly
     # split sentences into words
-    e_sentences = lapply(X=e,FUN=function(s) unlist(stringr::str_split(s, " ")))
-    f_sentences = lapply(X=f,FUN=function(s) unlist(stringr::str_split(s, " ")))
+    if (is.null(cl)) {
+      e_sentences = lapply(X=e,FUN=function(s) unlist(stringr::str_split(s, " ")))
+      f_sentences = lapply(X=f,FUN=function(s) unlist(stringr::str_split(s, " ")))
+    } else {
+      e_sentences = parallel::parLapply(X=e,fun=function(s) unlist(stringr::str_split(s, " ")), cl=cl)
+      f_sentences = parallel::parLapply(X=f,fun=function(s) unlist(stringr::str_split(s, " ")), cl=cl)
+    }
     # list of all unique words
     e_allwords = unique(unlist(stringr::str_split(e, pattern=" ")))
     f_allwords = unique(unlist(stringr::str_split(f, pattern=" ")))
     n = length(e_sentences); n_eword = length(e_allwords); n_fword = length(f_allwords)
     # perplexity calculation stuff
-    e_lengths = sapply(X=1:n, FUN=function(i) length(e_sentences[i][[1]]) )
-    f_loglengths = sapply(X=1:n, FUN=function(i) log(length(f_sentences[i][[1]])) )
+    if (is.null(cl)) {
+      e_lengths = sapply(X=1:n, FUN=function(i) length(e_sentences[i][[1]]) )
+      f_loglengths = sapply(X=1:n, FUN=function(i) log(length(f_sentences[i][[1]])) )
+    } else {
+      parallel::clusterExport(cl=cl,c('e_sentences','f_sentences'))
+      e_lengths = parallel::parSapply(X=1:n, FUN=function(i) length(e_sentences[i][[1]]), cl=cl )
+      f_loglengths = parallel::parSapply(X=1:n, FUN=function(i) log(length(f_sentences[i][[1]])), cl=cl )
+    }
     perp_const = sum(e_lengths*f_loglengths)
     perplex = rep(0,n)
 
@@ -111,26 +122,45 @@ IBM1 = function(e,f,maxiter=30,eps=0.01,sparse=FALSE,fmatch=FALSE) {
         tmp = (tmp*as.vector(e_wordfreq)) %*% d
         c_e_f[match_e,match_f] = c_e_f[match_e,match_f] + tmp
       }
-    }
+    } # end for i in 1:n
 
-    # t probs
+    # t probs and reset counts
     if (sparse) {
       t_e_f[] = c_e_f %*% Diagonal(x=1/colSums(c_e_f))
+      c_e_f[] = sparseMatrix(i=NULL,j=NULL,dims=c(n_eword,n_fword),x=1)
     } else {
       t_e_f[] = c_e_f %*% diag(1/colSums(c_e_f))
+      c_e_f[] = matrix(0,nrow=n_eword,ncol=n_fword)
     }
 
     # compute perplexity
     if (!fmatch) {
-      for (i in 1:n) {
-        perplex[i] = sum(t_e_f[e_sentences[i][[1]],f_sentences[i][[1]]])
-      }
+      if (is.null(cl)) {
+        for (i in 1:n) {
+          perplex[i] = sum(t_e_f[e_sentences[i][[1]],f_sentences[i][[1]]])
+        }
+      } else {
+        clusterExport(cl=cl,c('t_e_f','e_sentences','f_sentences'))
+        perplex = parallel::parSapply(
+          X=1:n,
+          FUN=function(i) sum(t_e_f[e_sentences[i][[1]], f_sentences[i][[1]]] )
+          , cl=cl)
+      } # if is.null
     } else {
-      for (i in 1:n) {
-        perplex[i] = sum(t_e_f[fmatch(e_sentences[i][[1]],e_allwords),
-                               fmatch(f_sentences[i][[1]],f_allwords)] )
-      }
-    }
+      if (is.null(cl)) {
+        for (i in 1:n) {
+          perplex[i] = sum(t_e_f[fmatch(e_sentences[i][[1]],e_allwords),
+                                 fmatch(f_sentences[i][[1]],f_allwords)] )
+        }
+      } else {
+        clusterExport(cl=cl,c('t_e_f','e_sentences','f_sentences','e_allwords','f_allwords'))
+        perplex = parallel::parSapply(
+          X=1:n,
+          FUN=function(i) sum(t_e_f[fmatch(e_sentences[i][[1]],e_allwords),
+                                    fmatch(f_sentences[i][[1]],f_allwords)] )
+          , cl=cl )
+      } # if is.null
+    } # if !fmatch
     prev_perplex = total_perplex
     total_perplex = -sum(perplex) + perp_const
     time_elapsed = round(difftime(Sys.time(),start_time,units='min'),3)
