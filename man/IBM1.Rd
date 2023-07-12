@@ -4,7 +4,7 @@
 \alias{IBM1}
 \title{IBM1 Model}
 \usage{
-IBM1(e, f, maxiter = 30, eps = 0.01, sparse = FALSE)
+IBM1(e, f, maxiter = 30, eps = 0.01, sparse = FALSE, fmatch = FALSE)
 }
 \arguments{
 \item{e}{vector of sentences in language we want to translate to}
@@ -16,6 +16,8 @@ IBM1(e, f, maxiter = 30, eps = 0.01, sparse = FALSE)
 \item{eps}{convergence criteria for perplexity}
 
 \item{sparse}{If FALSE (default), use base R matrices. If TRUE, use sparseMatrix from the Matrix package.}
+
+\item{fmatch}{If TRUE, use fmatch from fastmatch package for faster lookup. Otherwise use base R lookup.}
 }
 \value{
 \item{tmatrix}{Matrix of translation probabilities (cols are words from e, rows are words from f). If sparse=TRUE, tmatrix will be a sparseMatrix from the Matrix package, and will generally take up substantially less memory.}
@@ -40,7 +42,11 @@ unlink(temp);
 e = tolower(stringr::str_squish(tm::removePunctuation(ENFR$en[1:200])));
 f = tolower(stringr::str_squish(tm::removePunctuation(ENFR$fr[1:200])));
 
-# try with and without sparseMatrix
-test1 = SMT::IBM1(e,f,maxiter=200,eps=0.01,sparse=FALSE);
-test2 = SMT::IBM1(e,f,maxiter=200,eps=0.01,sparse=TRUE);
+# try with and without sparseMatrix (slow match)
+test1 = SMT::IBM1(e,f,maxiter=200,eps=0.01,sparse=FALSE,fmatch=FALSE);
+test2 = SMT::IBM1(e,f,maxiter=200,eps=0.01,sparse=TRUE,fmatch=FALSE);
+
+# try with and without sparseMatrix (fast match)
+test3 = SMT::IBM1(e,f,maxiter=200,eps=0.01,sparse=FALSE,fmatch=TRUE);
+test4 = SMT::IBM1(e,f,maxiter=200,eps=0.01,sparse=TRUE,fmatch=TRUE);
 }

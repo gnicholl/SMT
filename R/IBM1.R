@@ -8,6 +8,7 @@
 #' @param maxiter max number of EM iterations allowed
 #' @param eps convergence criteria for perplexity
 #' @param sparse If FALSE (default), use base R matrices. If TRUE, use sparseMatrix from the Matrix package.
+#' @param fmatch If TRUE, use fmatch from fastmatch package for faster lookup. Otherwise use base R lookup.
 #' @return
 #'    \item{tmatrix}{Matrix of translation probabilities (cols are words from e, rows are words from f). If sparse=TRUE, tmatrix will be a sparseMatrix from the Matrix package, and will generally take up substantially less memory.}
 #'    \item{numiter}{Number of iterations}
@@ -27,12 +28,16 @@
 #' e = tolower(stringr::str_squish(tm::removePunctuation(ENFR$en[1:200])));
 #' f = tolower(stringr::str_squish(tm::removePunctuation(ENFR$fr[1:200])));
 #'
-#' # try with and without sparseMatrix
-#' test1 = SMT::IBM1(e,f,maxiter=200,eps=0.01,sparse=FALSE);
-#' test2 = SMT::IBM1(e,f,maxiter=200,eps=0.01,sparse=TRUE);
+#' # try with and without sparseMatrix (slow match)
+#' test1 = SMT::IBM1(e,f,maxiter=200,eps=0.01,sparse=FALSE,fmatch=FALSE);
+#' test2 = SMT::IBM1(e,f,maxiter=200,eps=0.01,sparse=TRUE,fmatch=FALSE);
+#'
+#' # try with and without sparseMatrix (fast match)
+#' test3 = SMT::IBM1(e,f,maxiter=200,eps=0.01,sparse=FALSE,fmatch=TRUE);
+#' test4 = SMT::IBM1(e,f,maxiter=200,eps=0.01,sparse=TRUE,fmatch=TRUE);
 #' @import Matrix
 #' @export
-IBM1 = function(e,f,maxiter=30,eps=0.01,sparse=FALSE) {
+IBM1 = function(e,f,maxiter=30,eps=0.01,sparse=FALSE,fmatch=FALSE) {
 
   start_time = Sys.time()
 
@@ -83,11 +88,21 @@ IBM1 = function(e,f,maxiter=30,eps=0.01,sparse=FALSE) {
       f_wordfreq = table(f_sentences[i][[1]]); u_f_words = names(f_wordfreq)
 
       # update count matrices
-      tmp = t_e_f[u_e_words,u_f_words]
-      d = diag(f_wordfreq)
-      tmp = tmp/rowSums(  tmp %*% d  )
-      tmp = (tmp*as.vector(e_wordfreq)) %*% d
-      c_e_f[u_e_words,u_f_words] = c_e_f[u_e_words,u_f_words] + tmp
+      if (!fmatch) {
+        tmp = t_e_f[u_e_words,u_f_words]
+        d = diag(f_wordfreq)
+        tmp = tmp/rowSums(  tmp %*% d  )
+        tmp = (tmp*as.vector(e_wordfreq)) %*% d
+        c_e_f[u_e_words,u_f_words] = c_e_f[u_e_words,u_f_words] + tmp
+      } else {
+        match_e = fastmatch::fmatch(u_e_words,e_allwords)
+        match_f = fastmatch::fmatch(u_f_words,f_allwords)
+        tmp = t_e_f[match_e,match_f]
+        d = diag(f_wordfreq)
+        tmp = tmp/rowSums(  tmp %*% d  )
+        tmp = (tmp*as.vector(e_wordfreq)) %*% d
+        c_e_f[match_e,match_f] = c_e_f[match_e,match_f] + tmp
+      }
     }
 
     # t probs
