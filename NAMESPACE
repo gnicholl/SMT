@@ -2,3 +2,4 @@
 
 export(IBM1)
 import(Matrix)
+importFrom(fastmatch,fmatch)

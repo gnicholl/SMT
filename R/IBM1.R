@@ -35,31 +35,39 @@
 #' # try with and without sparseMatrix (fast match)
 #' test3 = SMT::IBM1(e,f,maxiter=200,eps=0.01,sparse=FALSE,fmatch=TRUE);
 #' test4 = SMT::IBM1(e,f,maxiter=200,eps=0.01,sparse=TRUE,fmatch=TRUE);
+#' @importFrom fastmatch fmatch
 #' @import Matrix
 #' @export
 IBM1 = function(e,f,maxiter=30,eps=0.01,sparse=FALSE,fmatch=FALSE) {
 
   start_time = Sys.time()
 
-  # keep list of words in each sentence
-  e_sentences = lapply(X=e,FUN=function(s) unlist(stringr::str_split(s, " ")))
-  f_sentences = lapply(X=f,FUN=function(s) unlist(stringr::str_split(s, " ")))
-  e_allwords = unique(unlist(stringr::str_split(e, pattern=" ")))
-  f_allwords = unique(unlist(stringr::str_split(f, pattern=" ")))
-  n = length(e_sentences); n_eword = length(e_allwords); n_fword = length(f_allwords)
+  # some things we'll need repeatedly
+    # split sentences into words
+    e_sentences = lapply(X=e,FUN=function(s) unlist(stringr::str_split(s, " ")))
+    f_sentences = lapply(X=f,FUN=function(s) unlist(stringr::str_split(s, " ")))
+    # list of all unique words
+    e_allwords = unique(unlist(stringr::str_split(e, pattern=" ")))
+    f_allwords = unique(unlist(stringr::str_split(f, pattern=" ")))
+    n = length(e_sentences); n_eword = length(e_allwords); n_fword = length(f_allwords)
+    # perplexity calculation stuff
+    e_lengths = sapply(X=1:n, FUN=function(i) length(e_sentences[i][[1]]) )
+    f_loglengths = sapply(X=1:n, FUN=function(i) log(length(f_sentences[i][[1]])) )
+    perp_const = sum(e_lengths*f_loglengths)
+    perplex = rep(0,n)
 
   # initialize matrices
   if (sparse) {
 
-    t_e_f = Matrix::sparseMatrix(i=NULL,j=NULL,dims=c(n_eword,n_fword),x=1)
-    c_e_f = Matrix::sparseMatrix(i=NULL,j=NULL,dims=c(n_eword,n_fword),x=1)
+    t_e_f = sparseMatrix(i=NULL,j=NULL,dims=c(n_eword,n_fword),x=1)
+    c_e_f = sparseMatrix(i=NULL,j=NULL,dims=c(n_eword,n_fword),x=1)
     rownames(t_e_f) = e_allwords
     colnames(t_e_f) = f_allwords
     rownames(c_e_f) = e_allwords
     colnames(c_e_f) = f_allwords
 
-    for (s in 1:n) {
-      t_e_f[e_sentences[s][[1]],f_sentences[s][[1]]] = 1/n_eword
+    for (i in 1:n) {
+      t_e_f[e_sentences[i][[1]],f_sentences[i][[1]]] = 1/n_eword
     }
 
   } else {
@@ -95,8 +103,8 @@ IBM1 = function(e,f,maxiter=30,eps=0.01,sparse=FALSE,fmatch=FALSE) {
         tmp = (tmp*as.vector(e_wordfreq)) %*% d
         c_e_f[u_e_words,u_f_words] = c_e_f[u_e_words,u_f_words] + tmp
       } else {
-        match_e = fastmatch::fmatch(u_e_words,e_allwords)
-        match_f = fastmatch::fmatch(u_f_words,f_allwords)
+        match_e = fmatch(u_e_words,e_allwords)
+        match_f = fmatch(u_f_words,f_allwords)
         tmp = t_e_f[match_e,match_f]
         d = diag(f_wordfreq)
         tmp = tmp/rowSums(  tmp %*% d  )
@@ -107,20 +115,24 @@ IBM1 = function(e,f,maxiter=30,eps=0.01,sparse=FALSE,fmatch=FALSE) {
 
     # t probs
     if (sparse) {
-      t_e_f[e_allwords,f_allwords] = c_e_f[e_allwords,f_allwords] %*% diag(1/colSums(c_e_f))
-      attributes(t_e_f)$Dimnames = attributes(c_e_f)$Dimnames
+      t_e_f[] = c_e_f %*% Diagonal(x=1/colSums(c_e_f))
     } else {
-      t_e_f = c_e_f %*% diag(1/colSums(c_e_f))
-      attributes(t_e_f) = attributes(c_e_f)
+      t_e_f[] = c_e_f %*% diag(1/colSums(c_e_f))
     }
 
     # compute perplexity
-    perplex = rep(0,n)
-    for (i in 1:n) {
-      perplex[i] = sum(t_e_f[e_sentences[i][[1]],f_sentences[i][[1]]]) - length(e_sentences[i][[1]])*log(length(f_sentences[i][[1]]))
+    if (!fmatch) {
+      for (i in 1:n) {
+        perplex[i] = sum(t_e_f[e_sentences[i][[1]],f_sentences[i][[1]]])
+      }
+    } else {
+      for (i in 1:n) {
+        perplex[i] = sum(t_e_f[fmatch(e_sentences[i][[1]],e_allwords),
+                               fmatch(f_sentences[i][[1]],f_allwords)] )
+      }
     }
     prev_perplex = total_perplex
-    total_perplex = -sum(perplex)
+    total_perplex = -sum(perplex) + perp_const
     time_elapsed = round(difftime(Sys.time(),start_time,units='min'),3)
     print(paste0("iter: ",iter,"; perplexity value: ",total_perplex, "; time elapsed: ",time_elapsed,"min"))
 
