@@ -4,7 +4,7 @@
 \alias{IBM1}
 \title{IBM1 Model}
 \usage{
-IBM1(e, f, maxiter = 30, eps = 0.01, sparse = FALSE, fmatch = FALSE)
+IBM1(e, f, maxiter = 30, eps = 0.01, sparse = FALSE, fmatch = FALSE, cl = NULL)
 }
 \arguments{
 \item{e}{vector of sentences in language we want to translate to}

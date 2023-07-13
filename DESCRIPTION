@@ -3,7 +3,7 @@ Title: R package for Statistical Machine Translation
 Version: 0.1
 Authors@R: 
     person("Gradon", "Nicholls", , "gradon.nicholls@gmail.com", role = c("aut", "cre"),
-           comment = c(ORCID = "YOUR-ORCID-ID"))
+           comment = c(ORCID = "0000-0002-1783-1201"))
 Description: R package for Statistical Machine Translation
 License: `use_mit_license()`, `use_gpl3_license()` or friends to pick a
     license
@@ -13,4 +13,5 @@ RoxygenNote: 7.2.3
 Imports:
     Matrix (>= 1.6),
     stringr (>= 1.5),
-    fastmatch (>= 1.1)
+    fastmatch (>= 1.1),
+    gtools (>= 3.9.4)
