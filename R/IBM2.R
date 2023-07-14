@@ -5,12 +5,14 @@
 #' @param e vector of sentences in language we want to translate to
 #' @param f vector of sentences in language we want to translate from
 #' @param maxiter max number of EM iterations allowed
-#' @param eps convergence criteria for perplexity
-#' @param init.IBM1 number of iterations of IBM1 to perform to initialize IBM2
+#' @param eps convergence criteria for perplexity (i.e. negative log-likelihood)
+#' @param init.IBM1 number of iterations (integer>=0) of IBM1 to perform to initialize IBM2 algorithm
 #' @param sparse If FALSE (default), use base R matrices. If TRUE, use sparseMatrix from the Matrix package.
 #' @param fmatch If TRUE, use fmatch from fastmatch package for faster lookup. Otherwise use base R lookup.
+#' @param cl From a parallel:makeCluster. Use to parallelize aspects of the code (only small embarassingly parallel parts). Default is NULL (no parallelization).
 #' @return
 #'    \item{tmatrix}{Matrix of translation probabilities (cols are words from e, rows are words from f). If sparse=TRUE, tmatrix will be a sparseMatrix from the Matrix package, and will generally take up substantially less memory.}
+#'    \item{amatrix}{A list of alignment probability matrices. E.g. amatrix[[3]][[4]] gives the alignment probability matrix for e sentences of length 3 and f sentences of length 4.}
 #'    \item{numiter}{Number of iterations}
 #'    \item{maxiter}{As above}
 #'    \item{eps}{As above}
@@ -28,13 +30,13 @@
 #' e = tolower(stringr::str_squish(tm::removePunctuation(ENFR$en[1:200])));
 #' f = tolower(stringr::str_squish(tm::removePunctuation(ENFR$fr[1:200])));
 #'
-#' # try with and without sparseMatrix (slow match)
-#' test1 = SMT::IBM1(e,f,maxiter=200,eps=0.01,sparse=FALSE,fmatch=FALSE);
-#' test2 = SMT::IBM1(e,f,maxiter=200,eps=0.01,sparse=TRUE,fmatch=FALSE);
-#'
-#' # try with and without sparseMatrix (fast match)
-#' test3 = SMT::IBM1(e,f,maxiter=200,eps=0.01,sparse=FALSE,fmatch=TRUE);
-#' test4 = SMT::IBM1(e,f,maxiter=200,eps=0.01,sparse=TRUE,fmatch=TRUE);
+#' # IBM1 guarantees global optimum, while IBM2 doesn't => initialize with IBM1.
+#' # IBM1 also faster, may make IBM2 faster overall.
+#' # Experiment with number of initial IBM1 iterations:
+#' test0 = SMT::IBM2(e,f,maxiter=50,eps=0.01,init.IBM1=0);
+#' test1 = SMT::IBM2(e,f,maxiter=50,eps=0.01,init.IBM1=1);
+#' test2 = SMT::IBM2(e,f,maxiter=50,eps=0.01,init.IBM1=2);
+#' test3 = SMT::IBM2(e,f,maxiter=50,eps=0.01,init.IBM1=3);
 #' @importFrom fastmatch fmatch
 #' @import Matrix
 #' @export
@@ -64,16 +66,10 @@ IBM2 = function(e,f,maxiter=30,eps=0.01,init.IBM1=2,sparse=FALSE,fmatch=FALSE,cl
   # initialize t matrix and counts
   if (sparse) {
 
-    t_e_f = sparseMatrix(i=NULL,j=NULL,dims=c(n_eword,n_fword),x=1)
+    t_e_f = out_IBM1$tmatrix
     c_e_f = sparseMatrix(i=NULL,j=NULL,dims=c(n_eword,n_fword),x=1)
-    rownames(t_e_f) = e_allwords
-    colnames(t_e_f) = f_allwords
     rownames(c_e_f) = e_allwords
     colnames(c_e_f) = f_allwords
-
-    for (i in 1:n) {
-      t_e_f[e_sentences[i][[1]],f_sentences[i][[1]]] = 1/n_eword
-    }
 
   } else {
 
@@ -126,17 +122,17 @@ IBM2 = function(e,f,maxiter=30,eps=0.01,init.IBM1=2,sparse=FALSE,fmatch=FALSE,cl
         c_e_f[u_e_words,u_f_words] = c_e_f[u_e_words,u_f_words] + biaggregate(tmp)[u_e_words,u_f_words]
 
       } else {
-        match_e = fmatch(u_e_words,e_allwords)
-        match_f = fmatch(u_f_words,f_allwords)
-        tmp = t_e_f[match_e,match_f]
-        d = diag(f_wordfreq)
-        tmp = tmp/rowSums(  tmp %*% d  )
-        tmp = (tmp*as.vector(e_wordfreq)) %*% d
-        c_e_f[match_e,match_f] = c_e_f[match_e,match_f] + tmp
+        tmp = t_e_f[fmatch(e_sen,e_allwords),fmatch(f_sen,f_allwords),drop=FALSE]
+        tmp = tmp*aprob[[le]][[lf]]
+        tmp = tmp / rowSums(  tmp  )
+        acount[[le]][[lf]] = acount[[le]][[lf]] + tmp
+        e_match = fmatch(u_e_words,e_allwords)
+        f_match = fmatch(u_f_words,f_allwords)
+        c_e_f[e_match,f_match] = c_e_f[e_match,f_match] + biaggregate(tmp)[u_e_words,u_f_words]
       }
     } # end for i in 1:n
 
-    # update probs, reset counts
+    # update t probs, reset counts
     if (sparse) {
       t_e_f[] = c_e_f %*% Diagonal(x=1/colSums(c_e_f))
       c_e_f[] = sparseMatrix(i=NULL,j=NULL,dims=c(n_eword,n_fword),x=1)
@@ -144,14 +140,14 @@ IBM2 = function(e,f,maxiter=30,eps=0.01,init.IBM1=2,sparse=FALSE,fmatch=FALSE,cl
       # compute tprob and reset count
       t_e_f[] = c_e_f %*% diag(1/colSums(c_e_f))
       c_e_f[] = matrix(0,nrow=n_eword,ncol=n_fword)
+    }
 
-      # compute aprob and reset count
-      for (k in 1:nrow(combos)) {
-        le = combos$e_lengths[k]
-        lf = combos$f_lengths[k]
-        aprob[[le]][[lf]] = acount[[le]][[lf]] / rowSums(acount[[le]][[lf]])
-        acount[[le]][[lf]] = matrix(0,nrow=le,ncol=lf)
-      }
+    # update a probs, reset counts
+    for (k in 1:nrow(combos)) {
+      le = combos$e_lengths[k]
+      lf = combos$f_lengths[k]
+      aprob[[le]][[lf]] = acount[[le]][[lf]] / rowSums(acount[[le]][[lf]])
+      acount[[le]][[lf]] = matrix(0,nrow=le,ncol=lf)
     }
 
     # compute perplexity
@@ -160,27 +156,33 @@ IBM2 = function(e,f,maxiter=30,eps=0.01,init.IBM1=2,sparse=FALSE,fmatch=FALSE,cl
         for (i in 1:n) {
           e_sen = e_sentences[i][[1]]; le = length(e_sen)
           f_sen = f_sentences[i][[1]]; lf = length(f_sen)
-          perplex[i] = sum(log(rowSums(t_e_f[e_sen,f_sen]*aprob[[le]][[lf]])))
+          perplex[i] = sum(log(rowSums(t_e_f[e_sen,f_sen,drop=FALSE]*aprob[[le]][[lf]])))
         }
       } else {
-        clusterExport(cl=cl,c('t_e_f','e_sentences','f_sentences'))
+        parallel::clusterExport(cl=cl,c('t_e_f','e_sentences','f_sentences'),envir=environment())
         perplex = parallel::parSapply(
           X=1:n,
-          FUN=function(i) sum(t_e_f[e_sentences[i][[1]], f_sentences[i][[1]]] )
+          FUN=function(i) sum(log(rowSums(t_e_f[  e_sentences[i][[1]] , f_sentences[i][[1]]  ,drop=FALSE]*
+                                          aprob[[ length(e_sentences[i][[1]]) ]][[ length(f_sentences[i][[1]]) ]]
+                              )))
           , cl=cl)
       } # if is.null
     } else {
       if (is.null(cl)) {
         for (i in 1:n) {
-          perplex[i] = sum(t_e_f[fmatch(e_sentences[i][[1]],e_allwords),
-                                 fmatch(f_sentences[i][[1]],f_allwords)] )
+          e_sen = e_sentences[i][[1]]; le = length(e_sen)
+          f_sen = f_sentences[i][[1]]; lf = length(f_sen)
+          perplex[i] = sum(log(rowSums(t_e_f[  fmatch(e_sen,e_allwords) , fmatch(f_sen,f_allwords) ,drop=FALSE]*
+                                         aprob[[le]][[lf]])))
         }
       } else {
-        clusterExport(cl=cl,c('t_e_f','e_sentences','f_sentences','e_allwords','f_allwords'))
+        parallel::clusterExport(cl=cl,c('t_e_f','e_sentences','f_sentences','e_allwords','f_allwords'),envir=environment())
         perplex = parallel::parSapply(
           X=1:n,
-          FUN=function(i) sum(t_e_f[fmatch(e_sentences[i][[1]],e_allwords),
-                                    fmatch(f_sentences[i][[1]],f_allwords)] )
+          FUN=function(i) sum(log(rowSums(t_e_f[  fmatch(e_sentences[i][[1]],e_allwords) ,
+                                                  fmatch(f_sentences[i][[1]],f_allwords)  ,drop=FALSE]*
+                                            aprob[[ length(e_sentences[i][[1]]) ]][[ length(f_sentences[i][[1]]) ]]
+                              )))
           , cl=cl )
       } # if is.null
     } # if !fmatch
@@ -193,7 +195,16 @@ IBM2 = function(e,f,maxiter=30,eps=0.01,init.IBM1=2,sparse=FALSE,fmatch=FALSE,cl
 
   } # end while
 
-  return(list(
+  # remove names from alist
+  for (k in 1:nrow(combos)) {
+    le = combos$e_lengths[k]
+    lf = combos$f_lengths[k]
+    rownames(aprob[[le]][[lf]]) = NULL
+    colnames(aprob[[le]][[lf]]) = NULL
+  }
+
+  # return list of results
+  retobj = list(
     "tmatrix"=t_e_f,
     "amatrix"=aprob,
     "numiter"=iter-1,
@@ -202,7 +213,9 @@ IBM2 = function(e,f,maxiter=30,eps=0.01,init.IBM1=2,sparse=FALSE,fmatch=FALSE,cl
     "converged"=abs(total_perplex - prev_perplex)<=eps,
     "perplexity"=total_perplex,
     "time_elapsed"=time_elapsed
-  ))
+  )
+  class(retobj) = "IBM2"
+  return(retobj)
 
 } # end function IBM2
 

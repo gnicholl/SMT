@@ -13,11 +13,13 @@ IBM1(e, f, maxiter = 30, eps = 0.01, sparse = FALSE, fmatch = FALSE, cl = NULL)
 
 \item{maxiter}{max number of EM iterations allowed}
 
-\item{eps}{convergence criteria for perplexity}
+\item{eps}{convergence criteria for perplexity (i.e. negative log-likelihood)}
 
 \item{sparse}{If FALSE (default), use base R matrices. If TRUE, use sparseMatrix from the Matrix package.}
 
 \item{fmatch}{If TRUE, use fmatch from fastmatch package for faster lookup. Otherwise use base R lookup.}
+
+\item{cl}{From a parallel:makeCluster. Use to parallelize aspects of the code (only small embarassingly parallel parts). Default is NULL (no parallelization).}
 }
 \value{
 \item{tmatrix}{Matrix of translation probabilities (cols are words from e, rows are words from f). If sparse=TRUE, tmatrix will be a sparseMatrix from the Matrix package, and will generally take up substantially less memory.}

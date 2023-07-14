@@ -6,9 +6,10 @@
 #' @param e vector of sentences in language we want to translate to
 #' @param f vector of sentences in language we want to translate from
 #' @param maxiter max number of EM iterations allowed
-#' @param eps convergence criteria for perplexity
+#' @param eps convergence criteria for perplexity (i.e. negative log-likelihood)
 #' @param sparse If FALSE (default), use base R matrices. If TRUE, use sparseMatrix from the Matrix package.
 #' @param fmatch If TRUE, use fmatch from fastmatch package for faster lookup. Otherwise use base R lookup.
+#' @param cl From a parallel:makeCluster. Use to parallelize aspects of the code (only small embarassingly parallel parts). Default is NULL (no parallelization).
 #' @return
 #'    \item{tmatrix}{Matrix of translation probabilities (cols are words from e, rows are words from f). If sparse=TRUE, tmatrix will be a sparseMatrix from the Matrix package, and will generally take up substantially less memory.}
 #'    \item{numiter}{Number of iterations}
@@ -60,7 +61,7 @@ IBM1 = function(e,f,maxiter=30,eps=0.01,sparse=FALSE,fmatch=FALSE,cl=NULL) {
       e_lengths = sapply(X=1:n, FUN=function(i) length(e_sentences[i][[1]]) )
       f_loglengths = sapply(X=1:n, FUN=function(i) log(length(f_sentences[i][[1]])) )
     } else {
-      parallel::clusterExport(cl=cl,c('e_sentences','f_sentences'))
+      parallel::clusterExport(cl=cl,c('e_sentences','f_sentences'),envir=environment())
       e_lengths = parallel::parSapply(X=1:n, FUN=function(i) length(e_sentences[i][[1]]), cl=cl )
       f_loglengths = parallel::parSapply(X=1:n, FUN=function(i) log(length(f_sentences[i][[1]])), cl=cl )
     }
@@ -139,32 +140,32 @@ IBM1 = function(e,f,maxiter=30,eps=0.01,sparse=FALSE,fmatch=FALSE,cl=NULL) {
         for (i in 1:n) {
           e_sen = e_sentences[i][[1]]; le = length(e_sen)
           f_sen = f_sentences[i][[1]]; lf = length(f_sen)
-          if (le==1 | lf==1) {
-            perplex[i] = log(sum(t_e_f[e_sen,f_sen]) )
-          } else {
-            perplex[i] = sum(log(rowSums(t_e_f[e_sen,f_sen] )))
-          }
+            perplex[i] = sum(log(rowSums(t_e_f[e_sen,f_sen,drop=FALSE] )))
         }
       } else {
-        clusterExport(cl=cl,c('t_e_f','e_sentences','f_sentences'))
+        parallel::clusterExport(cl=cl,c('t_e_f','e_sentences','f_sentences'),envir=environment())
         perplex = parallel::parSapply(
           X=1:n,
           FUN=function(i) sum(log(rowSums(t_e_f[e_sentences[i][[1]],
-                                                f_sentences[i][[1]]] )))
+                                                f_sentences[i][[1]],
+                                                drop=FALSE] )))
           , cl=cl)
       } # if is.null
     } else {
       if (is.null(cl)) {
         for (i in 1:n) {
           perplex[i] = sum(log(rowSums(t_e_f[fmatch(e_sentences[i][[1]],e_allwords),
-                                             fmatch(f_sentences[i][[1]],f_allwords)] )))
+                                             fmatch(f_sentences[i][[1]],f_allwords),
+                                             drop=FALSE]
+                                       )))
         }
       } else {
-        clusterExport(cl=cl,c('t_e_f','e_sentences','f_sentences','e_allwords','f_allwords'))
+        parallel::clusterExport(cl=cl,c('t_e_f','e_sentences','f_sentences','e_allwords','f_allwords'),envir=environment())
         perplex = parallel::parSapply(
           X=1:n,
           FUN=function(i) sum(log(rowSums(t_e_f[fmatch(e_sentences[i][[1]],e_allwords),
-                                                fmatch(f_sentences[i][[1]],f_allwords)] )))
+                                                fmatch(f_sentences[i][[1]],f_allwords),
+                                                drop=FALSE] )))
           , cl=cl )
       } # if is.null
     } # if !fmatch
@@ -177,7 +178,7 @@ IBM1 = function(e,f,maxiter=30,eps=0.01,sparse=FALSE,fmatch=FALSE,cl=NULL) {
 
   } # end while
 
-  return(list(
+  retobj = list(
     "tmatrix"=t_e_f,
     "numiter"=iter-1,
     "maxiter"=maxiter,
@@ -185,7 +186,9 @@ IBM1 = function(e,f,maxiter=30,eps=0.01,sparse=FALSE,fmatch=FALSE,cl=NULL) {
     "converged"=abs(total_perplex - prev_perplex)<=eps,
     "perplexity"=total_perplex,
     "time_elapsed"=time_elapsed
-    ))
+    )
+  class(retobj) = "IBM1"
+  return(retobj)
 
 } # end function IBM1
 

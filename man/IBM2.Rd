@@ -22,16 +22,19 @@ IBM2(
 
 \item{maxiter}{max number of EM iterations allowed}
 
-\item{eps}{convergence criteria for perplexity}
+\item{eps}{convergence criteria for perplexity (i.e. negative log-likelihood)}
 
-\item{init.IBM1}{nuber of iterations of IBM1 to perform to initialize IBM2}
+\item{init.IBM1}{number of iterations (integer>=0) of IBM1 to perform to initialize IBM2 algorithm}
 
 \item{sparse}{If FALSE (default), use base R matrices. If TRUE, use sparseMatrix from the Matrix package.}
 
 \item{fmatch}{If TRUE, use fmatch from fastmatch package for faster lookup. Otherwise use base R lookup.}
+
+\item{cl}{From a parallel:makeCluster. Use to parallelize aspects of the code (only small embarassingly parallel parts). Default is NULL (no parallelization).}
 }
 \value{
 \item{tmatrix}{Matrix of translation probabilities (cols are words from e, rows are words from f). If sparse=TRUE, tmatrix will be a sparseMatrix from the Matrix package, and will generally take up substantially less memory.}
+\item{amatrix}{A list of alignment probability matrices. E.g. amatrix[\link{3}][\link{4}] gives the alignment probability matrix for e sentences of length 3 and f sentences of length 4.}
 \item{numiter}{Number of iterations}
 \item{maxiter}{As above}
 \item{eps}{As above}
@@ -53,11 +56,11 @@ unlink(temp);
 e = tolower(stringr::str_squish(tm::removePunctuation(ENFR$en[1:200])));
 f = tolower(stringr::str_squish(tm::removePunctuation(ENFR$fr[1:200])));
 
-# try with and without sparseMatrix (slow match)
-test1 = SMT::IBM1(e,f,maxiter=200,eps=0.01,sparse=FALSE,fmatch=FALSE);
-test2 = SMT::IBM1(e,f,maxiter=200,eps=0.01,sparse=TRUE,fmatch=FALSE);
-
-# try with and without sparseMatrix (fast match)
-test3 = SMT::IBM1(e,f,maxiter=200,eps=0.01,sparse=FALSE,fmatch=TRUE);
-test4 = SMT::IBM1(e,f,maxiter=200,eps=0.01,sparse=TRUE,fmatch=TRUE);
+# IBM1 guarantees global optimum, while IBM2 doesn't => initialize with IBM1.
+# IBM1 also faster, may make IBM2 faster overall.
+# Experiment with number of initial IBM1 iterations:
+test0 = SMT::IBM2(e,f,maxiter=50,eps=0.01,init.IBM1=0);
+test1 = SMT::IBM2(e,f,maxiter=50,eps=0.01,init.IBM1=1);
+test2 = SMT::IBM2(e,f,maxiter=50,eps=0.01,init.IBM1=2);
+test3 = SMT::IBM2(e,f,maxiter=50,eps=0.01,init.IBM1=3);
 }

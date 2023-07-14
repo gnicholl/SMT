@@ -1,6 +1,7 @@
 
 
 biaggregate = function(namedmatrix) {
+  if(!is.matrix(namedmatrix)) namedmatrix=as.matrix(namedmatrix)
   blah2 = aggregate(namedmatrix,list(rownames(namedmatrix)),sum)
   rownames(blah2) = blah2[,1]
   blah2 = blah2[2:(ncol(namedmatrix)+1)]

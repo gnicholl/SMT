@@ -1,10 +1,10 @@
 
 #' (IBM1) Compute translation probabilities given a foreign sentence.
 #'
-#' Takes a sentence in a foreign language and produces a list of possible translations and their probabilities based on the IBM1 model.
-#' @param fsentence sentence in language you'd like to translate (vector or space-delimited string)
-#' @param tmatrix as output from IBM1()
-#' @param threshold reduce the number of words to consider by eliminating very unlikely ones with Prob<=threshold (default=0.001).
+#' Takes a sentence in a foreign language f and produces a list of possible translations in language e and their respective probabilities based on the IBM1 model. Only returns translations with probabilities > 0.
+#' @param object result from IBM1()
+#' @param fsentence sentence in f language you'd like to translate to e language (vector or space-delimited string)
+#' @param threshold reduce the number of e language words to consider by eliminating ones with Prob<=threshold (default=0.001).
 #' @param maxlength only consider translations which have maxlength words or fewer. By default, will look for translations with the same number of words (or fewer) as fsentence.
 #' @return A data.frame with two columns, sorted in descending order of pr:
 #'    \item{esentence}{Possible translation of fsentence.}
@@ -24,17 +24,17 @@
 #' out = IBM1(e,f,maxiter=50,eps=0.01);
 #'
 #' # possible english translations and their probabilities
-#' predict.IBM1(fsentence="une bière sil vous plaît",tmatrix=out$tmatrix)
+#' predict(out, fsentence="une bière sil vous plaît")
 #' @import Matrix
 #' @export
-predict_IBM1 = function(fsentence, tmatrix, threshold=0.001,
+predict.IBM1 = function(object, fsentence, threshold=0.001,
                        maxlength=length(unlist(stringr::str_split(fsentence, pattern=" ")))  ) {
 
   # extract relevant values from tmatrix
   fsentence = unlist(stringr::str_split(fsentence, pattern=" "))
   lf = length(fsentence)
-  tmp = tmatrix[,fsentence]
-  tmp = tmp[rowSums(tmp)>threshold,]
+  tmp = object$tmatrix[,fsentence,drop=FALSE]
+  tmp = tmp[rowSums(tmp)>threshold,,drop=FALSE]
 
   # compute probabilities for all possible sentences of length <= maxlength
   returnme = data.frame(esentence=character(0), pr=numeric(0))
@@ -52,8 +52,10 @@ predict_IBM1 = function(fsentence, tmatrix, threshold=0.001,
 
   } # end for
 
-  # sort dataframe and return
-  returnme = returnme[order(returnme$pr,decreasing=TRUE),]; rownames(returnme) = NULL
+  # sort dataframe, drop 0-probabilities, and return
+  returnme = returnme[order(returnme$pr,decreasing=TRUE),]
+  rownames(returnme) = NULL
+  returnme = returnme[returnme$pr>0,,drop=FALSE]
   return(returnme)
 
 } # predict.IBM1
