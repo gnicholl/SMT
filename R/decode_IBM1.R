@@ -28,7 +28,10 @@
 #' out = IBM1(e,f,maxiter=50,eps=0.01);
 #'
 #' # possible english translations and their probabilities
-#' decode(out, fsentence="une bière sil vous plaît")
+#' translations = decode(out, fsentence="une bière sil vous plaît")
+#'
+#' # 10 most likely translations
+#' translations = translations[1:10,,drop=FALSE]
 #' @import Matrix
 #' @export
 decode.IBM1 = function(object, fsentence, threshold=0.001,

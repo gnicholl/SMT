@@ -8,6 +8,7 @@
   object,
   fsentence,
   threshold = 0.001,
+  useIBM1 = FALSE,
   maxlength = length(unlist(stringr::str_split(fsentence, pattern = " ")))
 )
 }
@@ -17,6 +18,8 @@
 \item{fsentence}{sentence in f language you'd like to translate to e language (vector or space-delimited string)}
 
 \item{threshold}{reduce the number of e language words to consider by eliminating ones with Prob<=threshold (default=0.001).}
+
+\item{useIBM1}{(default FALSE) If TRUE, use IBM1 decoding method first to find most likely translations based on combinations, then use permutations only of this subset of translations.}
 
 \item{maxlength}{only consider e translations which have maxlength words or fewer. By default, will look for translations with the same number of words (or fewer) as fsentence.}
 }
@@ -48,5 +51,11 @@ f = tolower(stringr::str_squish(tm::removePunctuation(ENFR$fr[1:200])));
 out = IBM2(e,f,maxiter=50,eps=0.01,init.IBM1=5);
 
 # possible english translations and their probabilities
-decode(out, fsentence="une bière sil vous plaît")
+translations = decode(out, fsentence="une bière sil vous plaît")
+
+# 10 most likely translations
+translations = translations[1:10,,drop=FALSE]
+
+# might be a bit faster to screen translations with IBM1 method first:
+translations = decode(out, fsentence="une bière sil vous plaît", useIBM1=TRUE)
 }

@@ -47,5 +47,8 @@ f = tolower(stringr::str_squish(tm::removePunctuation(ENFR$fr[1:200])));
 out = IBM1(e,f,maxiter=50,eps=0.01);
 
 # possible english translations and their probabilities
-decode(out, fsentence="une bière sil vous plaît")
+translations = decode(out, fsentence="une bière sil vous plaît")
+
+# 10 most likely translations
+translations = translations[1:10,,drop=FALSE]
 }
