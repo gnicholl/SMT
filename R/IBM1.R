@@ -37,11 +37,16 @@
 #' test3 = SMT::IBM1(e,f,maxiter=200,eps=0.01,sparse=FALSE,fmatch=TRUE);
 #' test4 = SMT::IBM1(e,f,maxiter=200,eps=0.01,sparse=TRUE,fmatch=TRUE);
 #' @importFrom fastmatch fmatch
+#' @importFrom Rfast colsums
+#' @importFrom Rfast rowsums
 #' @import Matrix
 #' @export
 IBM1 = function(e,f,maxiter=30,eps=0.01,sparse=FALSE,fmatch=FALSE,cl=NULL) {
 
   start_time = Sys.time()
+  # set what functions to use
+  if (!sparse) rowSums = function(...) rowsums(..., parallel=!is.null(cl))
+  if (!sparse) colSums = function(...) colsums(..., parallel=!is.null(cl))
 
   # some things we'll need repeatedly
     # split sentences into words
@@ -130,7 +135,7 @@ IBM1 = function(e,f,maxiter=30,eps=0.01,sparse=FALSE,fmatch=FALSE,cl=NULL) {
       t_e_f[] = c_e_f %*% Diagonal(x=1/colSums(c_e_f))
       c_e_f[] = sparseMatrix(i=NULL,j=NULL,dims=c(n_eword,n_fword),x=1)
     } else {
-      t_e_f[] = c_e_f %*% diag(1/colSums(c_e_f))
+      t_e_f[] = c_e_f %*% diag(1/colSums(c_e_f)) # mat.mult(c_e_f,diag(1/colSums(c_e_f)))
       c_e_f[] = matrix(0,nrow=n_eword,ncol=n_fword)
     }
 

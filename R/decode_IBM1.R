@@ -1,11 +1,15 @@
 
 #' (IBM1) Compute translation probabilities given a foreign sentence.
 #'
-#' Takes a sentence in a foreign language f and produces a list of possible translations in language e and their respective probabilities based on the IBM1 model. Only returns translations with probabilities > 0.
+#' Takes a sentence in a foreign language f and produces a list of possible translations
+#' in language e and their respective probabilities based on the IBM1 model. Only returns
+#' translations with probabilities > 0. Currently works by considering all combinations (order doesn't matter)
+#' of most likely (based on threshold parameter) words from language e. Thus, caution
+#' should be taken in predicting very long sentences from language f.
 #' @param object result from IBM1()
 #' @param fsentence sentence in f language you'd like to translate to e language (vector or space-delimited string)
 #' @param threshold reduce the number of e language words to consider by eliminating ones with Prob<=threshold (default=0.001).
-#' @param maxlength only consider translations which have maxlength words or fewer. By default, will look for translations with the same number of words (or fewer) as fsentence.
+#' @param maxlength only consider e translations which have maxlength words or fewer. By default, will look for translations with the same number of words (or fewer) as fsentence.
 #' @return A data.frame with two columns, sorted in descending order of pr:
 #'    \item{esentence}{Possible translation of fsentence.}
 #'    \item{pr}{Translation probability (up to a constant).}
@@ -24,10 +28,10 @@
 #' out = IBM1(e,f,maxiter=50,eps=0.01);
 #'
 #' # possible english translations and their probabilities
-#' predict(out, fsentence="une bière sil vous plaît")
+#' decode(out, fsentence="une bière sil vous plaît")
 #' @import Matrix
 #' @export
-predict.IBM1 = function(object, fsentence, threshold=0.001,
+decode.IBM1 = function(object, fsentence, threshold=0.001,
                        maxlength=length(unlist(stringr::str_split(fsentence, pattern=" ")))  ) {
 
   # extract relevant values from tmatrix
@@ -58,4 +62,4 @@ predict.IBM1 = function(object, fsentence, threshold=0.001,
   returnme = returnme[returnme$pr>0,,drop=FALSE]
   return(returnme)
 
-} # predict.IBM1
+} # decode.IBM1

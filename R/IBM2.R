@@ -47,6 +47,10 @@ IBM2 = function(e,f,maxiter=30,eps=0.01,init.IBM1=2,sparse=FALSE,fmatch=FALSE,cl
   out_IBM1 = IBM1(e=e,f=f,maxiter=init.IBM1,eps=eps,sparse=sparse,fmatch=fmatch,cl=cl)
   print("------now run IBM2-------")
 
+  # set what functions to use
+  if (!sparse) rowSums = function(...) rowsums(...)
+  if (!sparse) colSums = function(...) colsums(...)
+
   # some things we'll need repeatedly
   # split sentences into words
   if (is.null(cl)) {

@@ -14,4 +14,5 @@ Imports:
     Matrix (>= 1.6),
     stringr (>= 1.5),
     fastmatch (>= 1.1),
-    gtools (>= 3.9.4)
+    gtools (>= 3.9.4),
+    Rfast (>= 2.0.7)
