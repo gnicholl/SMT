@@ -22,7 +22,7 @@ using the IBM1 method, and then finds the most likely permutations from this sho
 
 ## Help
 
-See `?IBM1`, `?IBM2`, `?IBM2`, `?decode.IBM1`, `?decode.IBM2` for more details.
+See `?IBM1`, `?IBM2`, `?IBM3`, `?decode.IBM1`, `?decode.IBM2` for more details.
 
 ## Sources
 
