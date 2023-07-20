@@ -37,6 +37,8 @@
 #' test1 = SMT::IBM2(e,f,maxiter=50,eps=0.01,init.IBM1=1);
 #' test2 = SMT::IBM2(e,f,maxiter=50,eps=0.01,init.IBM1=2);
 #' test3 = SMT::IBM2(e,f,maxiter=50,eps=0.01,init.IBM1=3);
+#' @importFrom Rfast colsums
+#' @importFrom Rfast rowsums
 #' @importFrom fastmatch fmatch
 #' @import Matrix
 #' @export
@@ -45,7 +47,7 @@ IBM2 = function(e,f,maxiter=30,eps=0.01,init.IBM1=2,sparse=FALSE,fmatch=FALSE,cl
   start_time = Sys.time()
   print(paste0("------running ",init.IBM1," iterations of IBM1-------"))
   out_IBM1 = IBM1(e=e,f=f,maxiter=init.IBM1,eps=eps,sparse=sparse,fmatch=fmatch,cl=cl)
-  print("------now run IBM2-------")
+  print(paste0("------running ",maxiter," iterations of IBM2-------"))
 
   # set what functions to use
   if (!sparse) rowSums = function(...) rowsums(...)
