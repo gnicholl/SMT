@@ -98,7 +98,7 @@ IBM4 = function(e, e_wordclass, f, f_wordclass, maxiter=5, eps=0.01, heuristic=T
 
   # initialize with IBM1, IBM2, IBM3
   start_time = Sys.time()
-  out_IBM3 = IBM3(e=e,f=f,maxiter=init.IBM3,init.IBM2=init.IBM2,init.IBM1=init.IBM1,sparse=sparse,fmatch=TRUE)
+  out_IBM3 = IBM3(e=e,f=f,maxiter=init.IBM3,init.IBM2=init.IBM2,init.IBM1=init.IBM1,sparse=sparse,fmatch=TRUE,maxfert=maxfert)
   print(paste0("------running ",maxiter," iterations of IBM4-------"))
 
   # set what functions to use
@@ -108,12 +108,14 @@ IBM4 = function(e, e_wordclass, f, f_wordclass, maxiter=5, eps=0.01, heuristic=T
   ### HELPER FUNCTIONS #########################################################
   # collects set of neighbouring alignments
   neighbouring = function(a,jpegged) {
-    N = NULL
+    N = matrix(0, nrow=(le-1)*(lf+1) + (le-1)*(le-2), ncol=le)
+    Nitr = 1
     for (j in (1:le)[-jpegged]) {
       for (i in 0:lf) {
         new_a = a
         new_a[j] = i
-        N = rbind(N,new_a)
+        N[Nitr,] = new_a
+        Nitr = Nitr + 1
       } # for i
     } # for j
 
@@ -121,7 +123,8 @@ IBM4 = function(e, e_wordclass, f, f_wordclass, maxiter=5, eps=0.01, heuristic=T
       for (j2 in (1:le)[-c(jpegged,j1)]) {
         new_a = a
         new_a[j1] = new_a[j2]
-        N = rbind(N,new_a)
+        N[Nitr,] = new_a
+        Nitr = Nitr + 1
       } # for j2
     } # for j1
 
@@ -136,12 +139,6 @@ IBM4 = function(e, e_wordclass, f, f_wordclass, maxiter=5, eps=0.01, heuristic=T
       aold = a
       neighbours = neighbouring(a,jpegged)
       for (r in 1:nrow(neighbours)) {
-        if (is.nan(alignmentprob(a))) {
-          return("error")
-        }
-        if (is.nan(alignmentprob(neighbours[r,]))) {
-          return("error")
-        }
         if ( alignmentprob(neighbours[r,]) > alignmentprob(a) ) a = neighbours[r,]
       }# for
     }# while
@@ -168,8 +165,7 @@ IBM4 = function(e, e_wordclass, f, f_wordclass, maxiter=5, eps=0.01, heuristic=T
           }
         }
         a = hillclimb(a,j)
-        if (all(a=="error")) return("error")
-        A = rbind(A,neighbouring(a,j))
+        A = rbind(A,a,neighbouring(a,j))
       } # for i
     } # for j
 

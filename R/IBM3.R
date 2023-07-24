@@ -57,21 +57,24 @@ IBM3 = function(e, f, maxiter=30, eps=0.01, heuristic=TRUE, maxfert=5, init.IBM1
   ### HELPER FUNCTIONS #########################################################
     # collects set of neighbouring alignments
     neighbouring = function(a,jpegged) {
-      N = NULL
+      N = matrix(0, nrow=(le-1)*(lf+1) + (le-1)*(le-2), ncol=le)
+      Nitr = 1
       for (j in (1:le)[-jpegged]) {
-          for (i in 0:lf) {
-            new_a = a
-            new_a[j] = i
-            N = rbind(N,new_a)
-          } # for i
+        for (i in 0:lf) {
+          new_a = a
+          new_a[j] = i
+          N[Nitr,] = new_a
+          Nitr = Nitr + 1
+        } # for i
       } # for j
 
       for (j1 in (1:le)[-jpegged]) {
-          for (j2 in (1:le)[-c(jpegged,j1)]) {
-            new_a = a
-            new_a[j1] = new_a[j2]
-            N = rbind(N,new_a)
-          } # for j2
+        for (j2 in (1:le)[-c(jpegged,j1)]) {
+          new_a = a
+          new_a[j1] = new_a[j2]
+          N[Nitr,] = new_a
+          Nitr = Nitr + 1
+        } # for j2
       } # for j1
 
       return(unique(N))
@@ -113,7 +116,7 @@ IBM3 = function(e, f, maxiter=30, eps=0.01, heuristic=TRUE, maxfert=5, init.IBM1
             }
           }
           a = hillclimb(a,j)
-          A = rbind(A,neighbouring(a,j)) ####SLOOOOW
+          A = rbind(A,a,neighbouring(a,j))
         } # for i
       } # for j
 
