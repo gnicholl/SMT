@@ -13,7 +13,8 @@ IBM3(
   maxfert = 5,
   init.IBM1 = 5,
   init.IBM2 = 10,
-  sparse = FALSE
+  sparse = FALSE,
+  fmatch = FALSE
 )
 }
 \arguments{
