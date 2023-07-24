@@ -16,7 +16,8 @@ IBM4(
   init.IBM1 = 5,
   init.IBM2 = 5,
   init.IBM3 = 3,
-  sparse = FALSE
+  sparse = FALSE,
+  fmatch = FALSE
 )
 }
 \arguments{

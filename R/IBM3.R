@@ -41,6 +41,7 @@
 #' @importFrom Rfast rowsums
 #' @import index0
 #' @import Matrix
+#' @import progress
 #' @importFrom fastmatch fmatch
 #' @export
 IBM3 = function(e, f, maxiter=30, eps=0.01, heuristic=TRUE, maxfert=5, init.IBM1=5, init.IBM2=10, sparse=FALSE, fmatch=FALSE) {
@@ -219,7 +220,7 @@ IBM3 = function(e, f, maxiter=30, eps=0.01, heuristic=TRUE, maxfert=5, init.IBM1
         f_sen = f_sentences[k][[1]]; lf = length(f_sen)
 
         # too many possible alignments -> get list of most likely ones from IBM2
-        pb$tick(tokens=list(what="0 step; sampling alignments"))
+        pb$tick(0,tokens=list(what="0 step; sampling alignments"))
         if (heuristic & le>1)  {
           A = sampleIBM3()
         } else {
