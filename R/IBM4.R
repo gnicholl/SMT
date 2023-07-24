@@ -319,7 +319,7 @@ IBM4 = function(e, e_wordclass, f, f_wordclass, maxiter=5, eps=0.01, heuristic=T
       f_sen = f_sentences[k][[1]]; lf = length(f_sen)
 
       # too many possible alignments -> get list of most likely ones from IBM2
-      pb$tick(tokens=list(what="0 step; sampling alignments"))
+      pb$tick(0,tokens=list(what="0 step; sampling alignments"))
       if (heuristic & le>1)  {
         A = sampleIBM3()
         if (all(A=="error")) {
@@ -343,13 +343,13 @@ IBM4 = function(e, e_wordclass, f, f_wordclass, maxiter=5, eps=0.01, heuristic=T
       }
 
       # compute probability of each alignment
-      pb$tick(tokens=list(what="E step; compute align probs"))
+      pb$tick(0,tokens=list(what="E step; compute align probs"))
       ctotal = sapply(X=1:nrow(A), FUN=function(r) alignmentprob(A[r,]))
       perplex_vec[k] = mean(ctotal)
       ctotal = ctotal / sum(ctotal)
 
       # update expected counts given probabilities
-      pb$tick(tokens=list(what="E step; expected counts    "))
+      pb$tick(0,tokens=list(what="E step; expected counts    "))
       for (r in 1:nrow(A)) {
         a = A[r,]
         f_sen_null = as.index0(c("<NULL>",f_sen))
@@ -431,6 +431,8 @@ IBM4 = function(e, e_wordclass, f, f_wordclass, maxiter=5, eps=0.01, heuristic=T
         }
 
       } # for a in A
+
+      pb$tick()
 
     } # for k (all sentences)
     pb$terminate()

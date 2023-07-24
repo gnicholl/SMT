@@ -227,13 +227,13 @@ IBM3 = function(e, f, maxiter=30, eps=0.01, heuristic=TRUE, maxfert=5, init.IBM1
         }
 
         # compute probability of each alignment
-        pb$tick(tokens=list(what="E step; compute align probs"))
+        pb$tick(0,tokens=list(what="E step; compute align probs"))
         ctotal = sapply(X=1:nrow(A), FUN=function(r) alignmentprob(A[r,]))
         perplex_vec[k] = mean(ctotal)
         ctotal = ctotal / sum(ctotal)
 
         # update expected counts given probabilities
-        pb$tick(tokens=list(what="E step; expected counts    "))
+        pb$tick(0,tokens=list(what="E step; expected counts    "))
         for (r in 1:nrow(A)) {
           a = A[r,]
           f_sen_null = as.index0(c("<NULL>",f_sen))
