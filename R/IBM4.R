@@ -437,7 +437,6 @@ IBM4 = function(e, e_wordclass, f, f_wordclass, maxiter=5, eps=0.01, heuristic=T
 
 
     ### M STEP #################################################################
-    pb$tick(tokens=list(what="M step; update counts      "))
     # translation probs
     tmp = colSums(c_e_f)
     t_e_f[,tmp>0] = c_e_f[,tmp>0] %*% diag(1/tmp[tmp>0])

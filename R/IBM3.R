@@ -270,7 +270,6 @@ IBM3 = function(e, f, maxiter=30, eps=0.01, heuristic=TRUE, maxfert=5, init.IBM1
 
 
     ### M STEP #################################################################
-      pb$tick(tokens=list(what="M step; update counts      "))
       # translation probs
       tmp = colSums(c_e_f)
       t_e_f[,tmp>0] = c_e_f[,tmp>0] %*% diag(1/tmp[tmp>0])
