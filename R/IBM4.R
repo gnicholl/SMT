@@ -433,6 +433,7 @@ IBM4 = function(e, e_wordclass, f, f_wordclass, maxiter=5, eps=0.01, heuristic=T
       } # for a in A
 
     } # for k (all sentences)
+    pb$terminate()
     ############################################################################
 
 

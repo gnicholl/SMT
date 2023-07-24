@@ -266,6 +266,7 @@ IBM3 = function(e, f, maxiter=30, eps=0.01, heuristic=TRUE, maxfert=5, init.IBM1
         pb$tick()
 
       } # for k (all sentences)
+      pb$terminate()
     ############################################################################
 
 
