@@ -16,7 +16,8 @@ Imports:
     fastmatch (>= 1.1),
     gtools (>= 3.9.4),
     Rfast (>= 2.0.7),
-    index0 (>= 0.0.1)
+    index0 (>= 0.0.1),
+    progress (>= 1.2.2)
 Suggests: 
     knitr,
     rmarkdown

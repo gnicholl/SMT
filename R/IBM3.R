@@ -211,13 +211,15 @@ IBM3 = function(e, f, maxiter=30, eps=0.01, heuristic=TRUE, maxfert=5, init.IBM1
   while (iter<=maxiter & abs(total_perplex - prev_perplex)>eps) { # until convergence
 
     ### E STEP #################################################################
+      pb = progress::progress_bar$new(total=n,clear=FALSE,
+        format=paste0("iteration ",iter," (:what) [:bar] :current/:total (eta: :eta)")  )
       for (k in 1:n) { # for all sentence pairs
-        print(k)
         # extract kth sentence pair
         e_sen = e_sentences[k][[1]]; le = length(e_sen)
         f_sen = f_sentences[k][[1]]; lf = length(f_sen)
 
         # too many possible alignments -> get list of most likely ones from IBM2
+        pb$tick(tokens=list(what="0 step; sampling alignments"))
         if (heuristic & le>1)  {
           A = sampleIBM3()
         } else {
@@ -225,11 +227,13 @@ IBM3 = function(e, f, maxiter=30, eps=0.01, heuristic=TRUE, maxfert=5, init.IBM1
         }
 
         # compute probability of each alignment
+        pb$tick(tokens=list(what="E step; compute align probs"))
         ctotal = sapply(X=1:nrow(A), FUN=function(r) alignmentprob(A[r,]))
         perplex_vec[k] = mean(ctotal)
         ctotal = ctotal / sum(ctotal)
 
         # update expected counts given probabilities
+        pb$tick(tokens=list(what="E step; expected counts    "))
         for (r in 1:nrow(A)) {
           a = A[r,]
           f_sen_null = as.index0(c("<NULL>",f_sen))
@@ -259,11 +263,14 @@ IBM3 = function(e, f, maxiter=30, eps=0.01, heuristic=TRUE, maxfert=5, init.IBM1
 
         } # for a in A
 
+        pb$tick()
+
       } # for k (all sentences)
     ############################################################################
 
 
     ### M STEP #################################################################
+      pb$tick(tokens=list(what="M step; update counts      "))
       # translation probs
       tmp = colSums(c_e_f)
       t_e_f[,tmp>0] = c_e_f[,tmp>0] %*% diag(1/tmp[tmp>0])

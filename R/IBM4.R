@@ -71,8 +71,9 @@
 #' @importFrom Rfast rowsums
 #' @import index0
 #' @import Matrix
+#' @importFrom fastmatch fmatch
 #' @export
-IBM4 = function(e, e_wordclass, f, f_wordclass, maxiter=5, eps=0.01, heuristic=TRUE, maxfert=5, init.IBM1=5, init.IBM2=5, init.IBM3=3, sparse=FALSE) {
+IBM4 = function(e, e_wordclass, f, f_wordclass, maxiter=5, eps=0.01, heuristic=TRUE, maxfert=5, init.IBM1=5, init.IBM2=5, init.IBM3=3, sparse=FALSE, fmatch=FALSE) {
 
   # check inputs
   if (any(is.na(e_wordclass))) stop("NAs present in e_wordclass")
@@ -98,7 +99,7 @@ IBM4 = function(e, e_wordclass, f, f_wordclass, maxiter=5, eps=0.01, heuristic=T
 
   # initialize with IBM1, IBM2, IBM3
   start_time = Sys.time()
-  out_IBM3 = IBM3(e=e,f=f,maxiter=init.IBM3,init.IBM2=init.IBM2,init.IBM1=init.IBM1,sparse=sparse,fmatch=TRUE,maxfert=maxfert)
+  out_IBM3 = IBM3(e=e,f=f,maxiter=init.IBM3,init.IBM2=init.IBM2,init.IBM1=init.IBM1,sparse=sparse,fmatch=fmatch,maxfert=maxfert)
   print(paste0("------running ",maxiter," iterations of IBM4-------"))
 
   # set what functions to use
@@ -178,9 +179,11 @@ IBM4 = function(e, e_wordclass, f, f_wordclass, maxiter=5, eps=0.01, heuristic=T
     f_aj = as.index1(f_sen_null[a]) # f word to which each e word aligned
     phi = as.index0( sapply(X=0:lf, FUN=function(i) sum(a==i)) ) # fertilities
     prob_null = choose(le-phi[0],phi[0]) * ( out_IBM3$p_null^phi[0] ) * ( max(1 - out_IBM3$p_null,0.0000001)^(le - 2*phi[0]) )
-    fert = sapply(X=1:lf, FUN=function(i) out_IBM3$fertmatrix[ f_sen[i], min(phi[i],maxfert)+1 ])
+    if (!fmatch) fert = sapply(X=1:lf, FUN=function(i) out_IBM3$fertmatrix[ f_sen[i], min(phi[i],maxfert)+1 ])
+    if (fmatch)  fert = sapply(X=1:lf, FUN=function(i) out_IBM3$fertmatrix[ fmatch(f_sen[i],fmat_rows), min(phi[i],maxfert)+1 ])
     prob_fert = prod( factorial(phi[1:lf]) * fert )
-    prob_t = prod(sapply(X=1:le, FUN=function(j) out_IBM3$tmatrix[ e_sen[j],f_aj[j] ] ))
+    if (!fmatch) prob_t = prod(sapply(X=1:le, FUN=function(j) out_IBM3$tmatrix[ e_sen[j],f_aj[j] ] ))
+    if (fmatch) prob_t = prod(sapply(X=1:le, FUN=function(j) out_IBM3$tmatrix[ fmatch(e_sen[j],tmat_rows),fmatch(f_aj[j],tmat_cols) ] ))
     prob_d = prod(sapply(X=1:le, FUN=function(j) out_IBM3$dmatrix[[le]][[lf]][j,a[j]+1] ))
 
     return(as.numeric(prob_null*prob_fert*prob_t*prob_d))
@@ -197,11 +200,13 @@ IBM4 = function(e, e_wordclass, f, f_wordclass, maxiter=5, eps=0.01, heuristic=T
     prob_null = choose(le-phi[0],phi[0]) * ( p_null^phi[0] ) * ( max(1 - p_null,0.0000001)^(le - 2*phi[0]) )
 
     # fertility
-    fert = sapply(X=1:lf, FUN=function(i) fertmatrix[ f_sen[i], min(phi[i],maxfert)+1 ])
+    if (!fmatch) fert = sapply(X=1:lf, FUN=function(i) fertmatrix[ f_sen[i], min(phi[i],maxfert)+1 ])
+    if (fmatch)  fert = sapply(X=1:lf, FUN=function(i) fertmatrix[ fmatch(f_sen[i],fmat_rows), min(phi[i],maxfert)+1 ])
     prob_fert = prod( factorial(phi[1:lf]) * fert )
 
     # translation
-    prob_t = prod(sapply(X=1:le, FUN=function(j) t_e_f[ e_sen[j],f_aj[j] ] ))
+    if (!fmatch) prob_t = prod(sapply(X=1:le, FUN=function(j) t_e_f[ e_sen[j],f_aj[j] ] ))
+    if (fmatch)  prob_t = prod(sapply(X=1:le, FUN=function(j) t_e_f[ fmatch(e_sen[j],tmat_rows),fmatch(f_aj[j],tmat_cols) ] ))
 
     # distortion
       # determine cept numbering
@@ -223,22 +228,27 @@ IBM4 = function(e, e_wordclass, f, f_wordclass, maxiter=5, eps=0.01, heuristic=T
       distortion = function(j) {
         if (a[j]==0) return(1) # ignore NULL token
 
+        if (fmatch)  elookup = e_wordclass[fmatch(e_sen[j],lookup_eclass)]
+        if (!fmatch) elookup = e_wordclass[match(e_sen[j],lookup_eclass)]
+
         ceptnumber = as.index0(c(0,ceptnumber))
         ceptj = ceptnumber[a[j]]
         if (j==which(ceptnumber[a]==ceptj)[1]) { # first position in cept
           prevcept = ceptj - 1
           if (prevcept==0) {
-            return(d1array[ f_wordclass[nclass_f+1] , e_wordclass[e_sen[j]] ,  which(dmap==(j - 0))  ])
+            return(d1array[ f_wordclass[nclass_f+1] , elookup ,  which(dmap==(j - 0))  ])
           } else {
             prevcept_positions = which(ceptnumber[a]==prevcept)
             prevcenter = ceiling(mean(prevcept_positions))
-            return(d1array[ f_wordclass[f_sen[which(ceptnumber==prevcept)-1]]   , e_wordclass[e_sen[j]] ,  which(dmap==(j - prevcenter))  ])
+            if (!fmatch) fclass = f_wordclass[f_sen[which(ceptnumber==prevcept)-1]]
+            if (fmatch ) fclass = f_wordclass[ fmatch(f_sen[which(ceptnumber==prevcept)-1], lookup_fclass) ]
+            return(d1array[ fclass   , elookup ,  which(dmap==(j - prevcenter))  ])
           }
         } else { # position 2 or greater in cept
           for (m in 2:length(which(ceptnumber[a]==ceptj))) {
             if (j==which(ceptnumber[a]==ceptj)[m]) {
               prevposition = which(ceptnumber[a]==ceptj)[m-1]
-              return(dg1array[ e_wordclass[e_sen[j]] , which(dmap==(j - prevposition))])
+              return(dg1array[ elookup , which(dmap==(j - prevposition))])
             }
           }
         } # endif
@@ -257,6 +267,8 @@ IBM4 = function(e, e_wordclass, f, f_wordclass, maxiter=5, eps=0.01, heuristic=T
   ### INITIALIZE MATRICES ######################################################
   # init tmatrix
   t_e_f = out_IBM3$tmatrix # translation probabilities
+  tmat_rows = rownames(t_e_f)
+  tmat_cols = colnames(t_e_f)
   if (!sparse) c_e_f = matrix(0,nrow=n_eword,ncol=n_fword)         # num. times f word translated as e word
   if (sparse)  c_e_f = sparseMatrix(i=NULL,j=NULL,dims=c(n_eword,n_fword),x=1)
   rownames(c_e_f) = e_allwords; colnames(c_e_f) = f_allwords
@@ -278,8 +290,12 @@ IBM4 = function(e, e_wordclass, f, f_wordclass, maxiter=5, eps=0.01, heuristic=T
   # init fertility matrix
   fertmatrix = out_IBM3$fertmatrix
   fertcount = matrix(0, nrow=n_fword, ncol=maxfert+1)
-  rownames(fertmatrix) = f_allwords
+  fmat_rows = rownames(fertmatrix)
   rownames(fertcount) = f_allwords
+
+  # word class vectors lookup tables
+  lookup_eclass = names(e_wordclass)
+  lookup_fclass = names(f_wordclass)
   ##############################################################################
 
 
@@ -294,6 +310,8 @@ IBM4 = function(e, e_wordclass, f, f_wordclass, maxiter=5, eps=0.01, heuristic=T
   while (iter<=maxiter & abs(total_perplex - prev_perplex)>eps) { # until convergence
 
     ### E STEP #################################################################
+    pb = progress::progress_bar$new(total=n,clear=FALSE,
+          format=paste0("iteration ",iter," (:what) [:bar] :current/:total (eta: :eta)")  )
     for (k in 1:n) { # for all sentence pairs
 
       # extract kth sentence pair
@@ -301,6 +319,7 @@ IBM4 = function(e, e_wordclass, f, f_wordclass, maxiter=5, eps=0.01, heuristic=T
       f_sen = f_sentences[k][[1]]; lf = length(f_sen)
 
       # too many possible alignments -> get list of most likely ones from IBM2
+      pb$tick(tokens=list(what="0 step; sampling alignments"))
       if (heuristic & le>1)  {
         A = sampleIBM3()
         if (all(A=="error")) {
@@ -324,11 +343,13 @@ IBM4 = function(e, e_wordclass, f, f_wordclass, maxiter=5, eps=0.01, heuristic=T
       }
 
       # compute probability of each alignment
+      pb$tick(tokens=list(what="E step; compute align probs"))
       ctotal = sapply(X=1:nrow(A), FUN=function(r) alignmentprob(A[r,]))
       perplex_vec[k] = mean(ctotal)
       ctotal = ctotal / sum(ctotal)
 
       # update expected counts given probabilities
+      pb$tick(tokens=list(what="E step; expected counts    "))
       for (r in 1:nrow(A)) {
         a = A[r,]
         f_sen_null = as.index0(c("<NULL>",f_sen))
@@ -337,7 +358,12 @@ IBM4 = function(e, e_wordclass, f, f_wordclass, maxiter=5, eps=0.01, heuristic=T
 
         # translation counts
         for (j in 1:le) {
-          c_e_f[e_sen[j],f_aj[j]] = c_e_f[e_sen[j],f_aj[j]] + ctotal[r]
+          if (!fmatch) c_e_f[e_sen[j],f_aj[j]] = c_e_f[e_sen[j],f_aj[j]] + ctotal[r]
+          if (fmatch) {
+            rmatch = fmatch(e_sen[j],e_allwords)
+            cmatch = fmatch(f_aj[j], f_allwords)
+            c_e_f[rmatch,cmatch] = c_e_f[rmatch,cmatch] + ctotal[r]
+          }
         }
 
         # distortion counts
@@ -359,18 +385,21 @@ IBM4 = function(e, e_wordclass, f, f_wordclass, maxiter=5, eps=0.01, heuristic=T
           # position distance for each e word
           ceptnumber = as.index0(c(0,ceptnumber))
           for (j in 1:le) {
+            if (fmatch)  elookup = e_wordclass[fmatch(e_sen[j],lookup_eclass)]
+            if (!fmatch) elookup = e_wordclass[match(e_sen[j],lookup_eclass)]
             if (a[j] > 0) {
               ceptj = ceptnumber[a[j]]
               if (j==which(ceptnumber[a]==ceptj)[1]) { # if first word in cept
                 prevcept = ceptj - 1
                 if (prevcept==0) { #previous cept is <NULL> (i.e. this is first cept)
-                  c_d1array[ f_wordclass[nclass_f+1] , e_wordclass[e_sen[j]] ,  which(dmap==(j - 0))  ] =
-                    c_d1array[ f_wordclass[nclass_f+1] , e_wordclass[e_sen[j]] ,  which(dmap==(j - 0))  ] + ctotal[r]
+                  c_d1array[ f_wordclass[nclass_f+1] , elookup ,  which(dmap==(j - 0))  ] =
+                    c_d1array[ f_wordclass[nclass_f+1] , elookup ,  which(dmap==(j - 0))  ] + ctotal[r]
                 } else {
                   prevcept_positions = which(ceptnumber[a]==prevcept)
                   prevcenter = ceiling(mean(prevcept_positions))
-                  fclass = f_wordclass[f_sen[which(ceptnumber==prevcept)-1]]
-                  eclass = e_wordclass[e_sen[j]]
+                  if (!fmatch) fclass = f_wordclass[f_sen[which(ceptnumber==prevcept)-1]]
+                  if (fmatch ) fclass = f_wordclass[ fmatch(f_sen[which(ceptnumber==prevcept)-1], lookup_fclass) ]
+                  eclass = e_wordclass[elookup]
                   d = which(dmap==(j - prevcenter))
                   c_d1array[fclass,eclass,d] = c_d1array[fclass,eclass,d] + ctotal[r]
                 }
@@ -379,7 +408,7 @@ IBM4 = function(e, e_wordclass, f, f_wordclass, maxiter=5, eps=0.01, heuristic=T
                 for (m in 2:length(which(ceptnumber[a]==ceptj))) {
                   if (j==which(ceptnumber[a]==ceptj)[m]) {
                     prevposition = which(ceptnumber[a]==ceptj)[m-1]
-                    eclass =  e_wordclass[e_sen[j]]
+                    eclass =  e_wordclass[elookup]
                     d = which(dmap==(j - prevposition))
                     c_dg1array[eclass,d] = c_dg1array[eclass,d] + ctotal[r]
                   }
@@ -394,7 +423,11 @@ IBM4 = function(e, e_wordclass, f, f_wordclass, maxiter=5, eps=0.01, heuristic=T
 
         # fertility counts
         for (i in 0:lf) {
-          fertcount[ f_sen_null[i], min(phi[i],maxfert)+1 ] = fertcount[ f_sen_null[i], min(phi[i],maxfert)+1 ] + ctotal[r]
+          if (!fmatch) fertcount[ f_sen_null[i], min(phi[i],maxfert)+1 ] = fertcount[ f_sen_null[i], min(phi[i],maxfert)+1 ] + ctotal[r]
+          if (fmatch) {
+            rmatch = fmatch(f_sen_null[i],fmat_rows)
+            fertcount[ rmatch, min(phi[i],maxfert)+1 ] = fertcount[ rmatch, min(phi[i],maxfert)+1 ] + ctotal[r]
+          }
         }
 
       } # for a in A
@@ -404,6 +437,7 @@ IBM4 = function(e, e_wordclass, f, f_wordclass, maxiter=5, eps=0.01, heuristic=T
 
 
     ### M STEP #################################################################
+    pb$tick(tokens=list(what="M step; update counts      "))
     # translation probs
     tmp = colSums(c_e_f)
     t_e_f[,tmp>0] = c_e_f[,tmp>0] %*% diag(1/tmp[tmp>0])
