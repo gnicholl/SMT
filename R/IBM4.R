@@ -150,7 +150,6 @@ IBM4 = function(e, e_wordclass, f, f_wordclass, maxiter=5, eps=0.01, heuristic=T
 
   # sampleIBM3: returns subset of alignments to iterate over
   sampleIBM3 = function(){
-    f_sen_null = as.index0(c("<NULL>",f_sen))
     A = NULL
     a = rep(0,le)
     for (j in 1:le) {
@@ -159,7 +158,11 @@ IBM4 = function(e, e_wordclass, f, f_wordclass, maxiter=5, eps=0.01, heuristic=T
         for (j_prime in (1:le)[-j]) {
           pr_prev = 0
           for (i_prime in 0:lf) {
-            pr_align_IBM3 = alignmentprobIBM3(a)
+            if (sum(a==0) > le/2) { # no need to try alignments with too many <NULL>s
+              pr_align_IBM3 = 0
+            } else {
+              pr_align_IBM3 = alignmentprob(a)
+            }
             if (pr_align_IBM3 > pr_prev) {
               a[j_prime] = i_prime
               pr_prev = pr_align_IBM3
@@ -180,15 +183,20 @@ IBM4 = function(e, e_wordclass, f, f_wordclass, maxiter=5, eps=0.01, heuristic=T
     f_aj = as.index1(f_sen_null[a]) # f word to which each e word aligned
     phi = as.index0( sapply(X=0:lf, FUN=function(i) sum(a==i)) ) # fertilities
     prob_null = choose(le-phi[0],phi[0]) * ( out_IBM3$p_null^phi[0] ) * ( max(1 - out_IBM3$p_null,0.0000001)^(le - 2*phi[0]) )
+      if (as.numeric(prob_null)==0) return(0)
     if (!fmatch) fert = sapply(X=1:lf, FUN=function(i) out_IBM3$fertmatrix[ f_sen[i], min(phi[i],maxfert)+1 ])
     if (fmatch)  fert = sapply(X=1:lf, FUN=function(i) out_IBM3$fertmatrix[ fmatch(f_sen[i],fmat_rows), min(phi[i],maxfert)+1 ])
     prob_fert = prod( factorial(phi[1:lf]) * fert )
+      if (as.numeric(prob_fert)==0) return(0)
     if (!fmatch) prob_t = prod(sapply(X=1:le, FUN=function(j) out_IBM3$tmatrix[ e_sen[j],f_aj[j] ] ))
     if (fmatch) prob_t = prod(sapply(X=1:le, FUN=function(j) out_IBM3$tmatrix[ fmatch(e_sen[j],tmat_rows),fmatch(f_aj[j],tmat_cols) ] ))
-    prob_d = prod(sapply(X=1:le, FUN=function(j) out_IBM3$dmatrix[[le]][[lf]][j,a[j]+1] ))
+      if (as.numeric(prob_t)==0) return(0)
+    #prob_d = prod(sapply(X=1:le, FUN=function(j) out_IBM3$dmatrix[[le]][[lf]][j,a[j]+1] ))
 
-    return(as.numeric(prob_null*prob_fert*prob_t*prob_d))
+    #return(as.numeric(prob_null*prob_fert*prob_t*prob_d))
+    return(as.numeric(prob_null*prob_fert*prob_t))
   }
+
 
   # alignmentprob(a) - computes probability of given alignment a
   #   inherits: e_sen, f_sen, le, lf, p_null, fertmatrix, t_e_f, dprob
@@ -267,7 +275,8 @@ IBM4 = function(e, e_wordclass, f, f_wordclass, maxiter=5, eps=0.01, heuristic=T
 
   ### INITIALIZE MATRICES ######################################################
   # init tmatrix
-  t_e_f = out_IBM3$tmatrix # translation probabilities
+  t_e_f = out_IBM3$tmatrix + 0.3/n_eword # add some noise to initial conditions
+  t_e_f[] = t_e_f %*% diag(1/colSums(t_e_f))
   tmat_rows = rownames(t_e_f)
   tmat_cols = colnames(t_e_f)
   if (!sparse) c_e_f = matrix(0,nrow=n_eword,ncol=n_fword)         # num. times f word translated as e word
@@ -284,12 +293,15 @@ IBM4 = function(e, e_wordclass, f, f_wordclass, maxiter=5, eps=0.01, heuristic=T
   dmap = c((-max_le):-1 ,0,  1:(max_le))
 
   # init NULL prob
-  p_null = max(out_IBM3$p_null,0.25)
+  p_null = out_IBM3$p_null
   p1count = 0
   p0count = 0
 
   # init fertility matrix
   fertmatrix = out_IBM3$fertmatrix
+  fertmatrix = fertmatrix + (1/(maxfert+1))
+  fertmatrix[] = fertmatrix / rowSums(fertmatrix)
+
   fertcount = matrix(0, nrow=n_fword, ncol=maxfert+1)
   fmat_rows = rownames(fertmatrix)
   rownames(fertcount) = f_allwords
@@ -311,7 +323,7 @@ IBM4 = function(e, e_wordclass, f, f_wordclass, maxiter=5, eps=0.01, heuristic=T
   while (iter<=maxiter & abs(total_perplex - prev_perplex)>eps) { # until convergence
 
     ### E STEP #################################################################
-    pb = progress::progress_bar$new(total=n,clear=FALSE,
+    pb = progress::progress_bar$new(total=n,clear=TRUE,
           format=paste0("iteration ",iter," (:what) [:bar] :current/:total (eta: :eta)")  )
     for (k in 1:n) { # for all sentence pairs
 
@@ -322,32 +334,28 @@ IBM4 = function(e, e_wordclass, f, f_wordclass, maxiter=5, eps=0.01, heuristic=T
       # too many possible alignments -> get list of most likely ones from IBM2
       pb$tick(0,tokens=list(what="0 step; sampling alignments"))
       if (heuristic & le>1)  {
+      #if (FALSE) {
         A = sampleIBM3()
-        if (all(A=="error")) {
-          retobj = list(
-            "tmatrix"=t_e_f,
-            "dmatrix"=dprob,
-            "fertmatrix"=fertmatrix,
-            "p_null"=as.numeric(p_null),
-            "numiter"=iter-1,
-            "maxiter"=maxiter,
-            "eps"=eps,
-            "converged"=abs(total_perplex - prev_perplex)<=eps,
-            "perplexity"=total_perplex,
-            "time_elapsed"=time_elapsed
-          )
-          class(retobj) = "IBM3"
-          return(retobj)
-        }
       } else {
         A = gtools::permutations(n=lf+1,r=le,v=0:lf,repeats.allowed=TRUE)
+        #A = A[rowSums(A==0) <= le/2,]
+        #fkeep = fertmatrix[c("<NULL>",f_sen),]>0.000001
+        #for (j in 0:lf) A = A[rowSums(A==j) %in% ( which(fkeep[j+1,]) - 1) , ]
+
+        #tmp = t_e_f[e_sen,f_sen]
+        #for (j in 1:le) {
+        #  for (i in 1:lf) {
+        #    if (tmp[j,i] == 0) A = A[A[,j]!=i,]
+        #  }
+        #}
       }
 
       # compute probability of each alignment
       pb$tick(0,tokens=list(what="E step; compute align probs"))
       ctotal = sapply(X=1:nrow(A), FUN=function(r) alignmentprob(A[r,]))
       perplex_vec[k] = mean(ctotal)
-      ctotal = ctotal / sum(ctotal)
+      if (sum(ctotal)==0) warning(paste0("sentence ",k,": all sampled alignments had probability 0"),immediate. = TRUE)
+      if (sum(ctotal)>0) ctotal = ctotal / sum(ctotal)
 
       # update expected counts given probabilities
       pb$tick(0,tokens=list(what="E step; expected counts    "))
@@ -443,7 +451,8 @@ IBM4 = function(e, e_wordclass, f, f_wordclass, maxiter=5, eps=0.01, heuristic=T
     ### M STEP #################################################################
     # translation probs
     tmp = colSums(c_e_f)
-    t_e_f[,tmp>0] = c_e_f[,tmp>0] %*% diag(1/tmp[tmp>0])
+    if (sum(tmp>0)>1)  t_e_f[,tmp>0] = c_e_f[,tmp>0] %*% diag(1/tmp[tmp>0])
+    if (sum(tmp>0)==1) t_e_f[,tmp>0] = c_e_f[,tmp>0] * (1/tmp[tmp>0])
 
     # distortion probs
     for (h in 1:nclass_e) {
@@ -455,7 +464,7 @@ IBM4 = function(e, e_wordclass, f, f_wordclass, maxiter=5, eps=0.01, heuristic=T
 
     # fertility probs
     tmp = rowSums(fertcount)
-    fertmatrix[tmp>0,] = fertcount[tmp>0,] / tmp[tmp>0]
+    if (any(tmp>0)) fertmatrix[tmp>0,] = fertcount[tmp>0,] / tmp[tmp>0]
 
     # NULL token probs
     p_null = p1count / (p1count + p0count)
@@ -473,11 +482,10 @@ IBM4 = function(e, e_wordclass, f, f_wordclass, maxiter=5, eps=0.01, heuristic=T
     fertcount[] = 0
     p1count = 0; p0count = 0
 
-    # perplexity
-
     # iterate
     prev_perplex = total_perplex
     total_perplex = -sum(log(perplex_vec))
+    total_perplex = -sum(log(perplex_vec[perplex_vec>0]))
     time_elapsed = round(difftime(Sys.time(),start_time,units='min'),3)
     print(paste0("iter: ",iter,"; perplexity value: ",total_perplex, "; time elapsed: ",time_elapsed,"min"))
     iter = iter + 1

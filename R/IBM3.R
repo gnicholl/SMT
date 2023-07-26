@@ -101,25 +101,27 @@ IBM3 = function(e, f, maxiter=30, eps=0.01, heuristic=TRUE, maxfert=5, init.IBM1
       f_sen_null = as.index0(c("<NULL>",f_sen))
       A = NULL
       a = rep(0,le)
-      for (j in 1:le) {
-        for (i in 0:lf) {
-          a[j] = i # pegging one alignment point
-          for (j_prime in (1:le)[-j]) {
-            pr_prev = 0
-            for (i_prime in 0:lf) {
-              if (fmatch) pr_align_IBM2 = out_IBM2$tmatrix[fmatch(e_sen[j_prime],tmat_rnames),fmatch(f_sen_null[i_prime],tmat_cnames)]*
-                                           out_IBM2$amatrix[[le]][[lf+1]][j_prime,i_prime+1]
-              if (!fmatch)  pr_align_IBM2 = out_IBM2$tmatrix[e_sen[j_prime],f_sen_null[i_prime]]*out_IBM2$amatrix[[le]][[lf+1]][j_prime,i_prime+1]
-              if (pr_align_IBM2 > pr_prev) {
-                a[j_prime] = i_prime
-                pr_prev = pr_align_IBM2
+        for (j in 1:le) {
+          for (i in 0:lf) {
+            a[j] = i # pegging one alignment point
+            for (j_prime in (1:le)[-j]) {
+              pr_prev = 0
+              for (i_prime in 0:lf) {
+                if (fmatch) pr_align_IBM2 = t_e_f[fmatch(e_sen[j_prime],tmat_rnames),fmatch(f_sen_null[i_prime],tmat_cnames)]*
+                                             dprob[[le]][[lf]][j_prime,i_prime+1]
+                if (!fmatch)  pr_align_IBM2 = t_e_f[e_sen[j_prime],f_sen_null[i_prime]]*dprob[[le]][[lf]][j_prime,i_prime+1]
+                if (pr_align_IBM2 > pr_prev) {
+                  a[j_prime] = i_prime
+                  pr_prev = pr_align_IBM2
+                }
               }
             }
-          }
-          a = hillclimb(a,j)
-          A = rbind(A,a,neighbouring(a,j))
-        } # for i
-      } # for j
+
+            # find best candidates close by
+            a = hillclimb(a,j)
+            A = rbind(A,a,neighbouring(a,j))
+          } # for i
+        } # for j
 
       return(unique(A))
     } # sampleIBM3
@@ -164,7 +166,9 @@ IBM3 = function(e, f, maxiter=30, eps=0.01, heuristic=TRUE, maxfert=5, init.IBM1
     n = length(e_sentences); n_eword = length(e_allwords); n_fword = length(f_allwords)
 
     # init tmatrix
-    t_e_f = out_IBM2$tmatrix # translation probabilities
+    t_e_f = out_IBM2$tmatrix + 0.3/n_eword # add some noise to initial conditions
+    t_e_f[] = t_e_f %*% diag(1/colSums(t_e_f))
+
     if (!sparse) c_e_f = matrix(0,nrow=n_eword,ncol=n_fword)         # num. times f word translated as e word
     if (sparse)  c_e_f = sparseMatrix(i=NULL,j=NULL,dims=c(n_eword,n_fword),x=1)
     rownames(c_e_f) = e_allwords; colnames(c_e_f) = f_allwords
@@ -212,7 +216,7 @@ IBM3 = function(e, f, maxiter=30, eps=0.01, heuristic=TRUE, maxfert=5, init.IBM1
   while (iter<=maxiter & abs(total_perplex - prev_perplex)>eps) { # until convergence
 
     ### E STEP #################################################################
-      pb = progress::progress_bar$new(total=n,clear=FALSE,
+      pb = progress::progress_bar$new(total=n,clear=TRUE,
         format=paste0("iteration ",iter," (:what) [:bar] :current/:total (eta: :eta)")  )
       for (k in 1:n) { # for all sentence pairs
         # extract kth sentence pair
@@ -231,37 +235,39 @@ IBM3 = function(e, f, maxiter=30, eps=0.01, heuristic=TRUE, maxfert=5, init.IBM1
         pb$tick(0,tokens=list(what="E step; compute align probs"))
         ctotal = sapply(X=1:nrow(A), FUN=function(r) alignmentprob(A[r,]))
         perplex_vec[k] = mean(ctotal)
-        ctotal = ctotal / sum(ctotal)
+        if (sum(ctotal)==0) warning(paste0("sentence ",k,": all sampled alignments had probability 0"),immediate. = TRUE)
+        if (sum(ctotal)>0) ctotal = ctotal / sum(ctotal)
 
         # update expected counts given probabilities
         pb$tick(0,tokens=list(what="E step; expected counts    "))
         for (r in 1:nrow(A)) {
-          a = A[r,]
-          f_sen_null = as.index0(c("<NULL>",f_sen))
-          f_aj = as.index1(f_sen_null[a]) # f word to which each e word aligned
-          phi = as.index0( sapply(X=0:lf, FUN=function(i) sum(a==i)) ) # fertilities
+          if (ctotal[r]>0) { # only care about possible alignments
+            a = A[r,]
+            f_sen_null = as.index0(c("<NULL>",f_sen))
+            f_aj = as.index1(f_sen_null[a]) # f word to which each e word aligned
+            phi = as.index0( sapply(X=0:lf, FUN=function(i) sum(a==i)) ) # fertilities
 
-          for (j in 1:le) {
-            if (!fmatch) c_e_f[e_sen[j],f_aj[j]]      = c_e_f[e_sen[j],f_aj[j]]      + ctotal[r]
-            if (fmatch)  {
-              rlookup = fmatch(e_sen[j],e_allwords)
-              clookup = fmatch(f_aj[j], f_allwords)
-              c_e_f[rlookup,clookup]      = c_e_f[rlookup,clookup]      + ctotal[r]
+            for (j in 1:le) {
+              if (!fmatch) c_e_f[e_sen[j],f_aj[j]]      = c_e_f[e_sen[j],f_aj[j]]      + ctotal[r]
+              if (fmatch)  {
+                rlookup = fmatch(e_sen[j],e_allwords)
+                clookup = fmatch(f_aj[j], f_allwords)
+                c_e_f[rlookup,clookup]      = c_e_f[rlookup,clookup]      + ctotal[r]
+              }
+              dcount[[le]][[lf]][j,a[j]+1] = dcount[[le]][[lf]][j,a[j]+1] + ctotal[r]
             }
-            dcount[[le]][[lf]][j,a[j]+1] = dcount[[le]][[lf]][j,a[j]+1] + ctotal[r]
-          }
 
-          p1count = p1count + phi[0]*ctotal[r]
-          p0count = p0count + (le - 2*phi[0])*ctotal[r]
+            p1count = p1count + phi[0]*ctotal[r]
+            p0count = p0count + (le - 2*phi[0])*ctotal[r]
 
-          for (i in 0:lf) {
-            if (!fmatch) fertcount[ f_sen_null[i], min(phi[i],maxfert)+1 ] = fertcount[ f_sen_null[i], min(phi[i],maxfert)+1 ] + ctotal[r]
-            if (fmatch) {
-              rlookup = fmatch(f_sen_null[i], f_allwords)
-              fertcount[ rlookup, min(phi[i],maxfert)+1 ] = fertcount[ rlookup, min(phi[i],maxfert)+1 ] + ctotal[r]
+            for (i in 0:lf) {
+              if (!fmatch) fertcount[ f_sen_null[i], min(phi[i],maxfert)+1 ] = fertcount[ f_sen_null[i], min(phi[i],maxfert)+1 ] + ctotal[r]
+              if (fmatch) {
+                rlookup = fmatch(f_sen_null[i], f_allwords)
+                fertcount[ rlookup, min(phi[i],maxfert)+1 ] = fertcount[ rlookup, min(phi[i],maxfert)+1 ] + ctotal[r]
+              }
             }
-          }
-
+          } # if ctotal[r]>0
         } # for a in A
 
         pb$tick()
@@ -274,7 +280,8 @@ IBM3 = function(e, f, maxiter=30, eps=0.01, heuristic=TRUE, maxfert=5, init.IBM1
     ### M STEP #################################################################
       # translation probs
       tmp = colSums(c_e_f)
-      t_e_f[,tmp>0] = c_e_f[,tmp>0] %*% diag(1/tmp[tmp>0])
+      if (sum(tmp>0)>1)  t_e_f[,tmp>0] = c_e_f[,tmp>0] %*% diag(1/tmp[tmp>0])
+      if (sum(tmp>0)==1) t_e_f[,tmp>0] = c_e_f[,tmp>0] * (1/tmp[tmp>0])
 
       # distortion probs
       for (k in 1:nrow(combos)) {
@@ -284,13 +291,14 @@ IBM3 = function(e, f, maxiter=30, eps=0.01, heuristic=TRUE, maxfert=5, init.IBM1
           dprob[[le]][[lf]][] = 1
         } else {
           tmp = colSums(dcount[[le]][[lf]])
-          dprob[[le]][[lf]][,tmp>0] = dcount[[le]][[lf]][,tmp>0] %*% diag(1/tmp[tmp>0])
+          if (sum(tmp>0)>1)  dprob[[le]][[lf]][,tmp>0] = dcount[[le]][[lf]][,tmp>0] %*% diag(1/tmp[tmp>0])
+          if (sum(tmp>0)==1) dprob[[le]][[lf]][,tmp>0] = dcount[[le]][[lf]][,tmp>0] * (1/tmp[tmp>0])
         }
       }
 
       # fertility probs
       tmp = rowSums(fertcount)
-      fertmatrix[tmp>0,] = fertcount[tmp>0,] / tmp[tmp>0]
+      if (any(tmp>0)) fertmatrix[tmp>0,] = fertcount[tmp>0,] / tmp[tmp>0]
 
       # NULL token probs
       p_null = p1count / (p1count + p0count)
@@ -298,8 +306,14 @@ IBM3 = function(e, f, maxiter=30, eps=0.01, heuristic=TRUE, maxfert=5, init.IBM1
 
 
     ### HOUSEKEEPING ###########################################################
-      # fix NaNs
+      # fix NaNs / infs
       t_e_f[is.infinite(t_e_f)] = 1; t_e_f[is.nan(t_e_f)] = 0
+      for (k in 1:nrow(combos)) {
+        le = combos$e_lengths[k]
+        lf = combos$f_lengths[k]
+        dprob[[le]][[lf]][is.nan(dprob[[le]][[lf]])]      = 0
+        dprob[[le]][[lf]][is.infinite(dprob[[le]][[lf]])] = 1
+      }
 
       # reinitialize to 0
       c_e_f[] = 0
@@ -315,7 +329,7 @@ IBM3 = function(e, f, maxiter=30, eps=0.01, heuristic=TRUE, maxfert=5, init.IBM1
 
       # iterate
       prev_perplex = total_perplex
-      total_perplex = -sum(log(perplex_vec))
+      total_perplex = -sum(log(perplex_vec[perplex_vec>0]))
       time_elapsed = round(difftime(Sys.time(),start_time,units='min'),3)
       print(paste0("iter: ",iter,"; perplexity value: ",total_perplex, "; time elapsed: ",time_elapsed,"min"))
       iter = iter + 1
@@ -333,7 +347,8 @@ IBM3 = function(e, f, maxiter=30, eps=0.01, heuristic=TRUE, maxfert=5, init.IBM1
     "eps"=eps,
     "converged"=abs(total_perplex - prev_perplex)<=eps,
     "perplexity"=total_perplex,
-    "time_elapsed"=time_elapsed
+    "time_elapsed"=time_elapsed,
+    "IBMtmatrix"=out_IBM2$IBMtmatrix
   )
   class(retobj) = "IBM3"
   return(retobj)

@@ -218,7 +218,8 @@ IBM2 = function(e,f,maxiter=30,eps=0.01,init.IBM1=2,sparse=FALSE,fmatch=FALSE,cl
     "eps"=eps,
     "converged"=abs(total_perplex - prev_perplex)<=eps,
     "perplexity"=total_perplex,
-    "time_elapsed"=time_elapsed
+    "time_elapsed"=time_elapsed,
+    "IBMtmatrix"=out_IBM1$tmatrix
   )
   class(retobj) = "IBM2"
   return(retobj)
