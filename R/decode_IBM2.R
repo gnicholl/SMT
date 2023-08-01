@@ -1,20 +1,19 @@
 
 #' (IBM2) Compute translation probabilities given a foreign sentence.
 #'
-#' Takes a sentence in a foreign language f and produces a list of possible translations
-#' in language e and their respective probabilities based on the IBM1 model. Only returns
-#' translations with probabilities > 0. Currently works by considering all permutations
-#' (unlike IBM1, order matters, making the list even longer)
-#' of most likely (based on threshold parameter) words from language e. Thus, caution
-#' should be taken in predicting very long sentences from language f.
+#' Takes a sentence in a foreign language f and produces the best translation
+#' it can find based on IBM2 model. It starts with a word-by-word translation
+#' into e language. Then it iterates between 4 heuristics: dropping a word,
+#' reordering words, trying alternate translations of words, or adding
+#' alternate translations of words. These heuristics are necessary to make
+#' decoding computationally reasonable, but may result in a local optimum
+#' rather than a global optimum.
 #' @param object result from IBM2()
 #' @param fsentence sentence in f language you'd like to translate to e language (vector or space-delimited string)
-#' @param threshold reduce the number of e language words to consider by eliminating ones with Prob<=threshold (default=0.001).
-#' @param maxlength only consider e translations which have maxlength words or fewer. By default, will look for translations with the same number of words (or fewer) as fsentence.
-#' @param useIBM1 (default FALSE) If TRUE, use IBM1 decoding method first to find most likely translations based on combinations, then use permutations only of this subset of translations.
-#' @return A data.frame with two columns, sorted in descending order of pr:
-#'    \item{esentence}{Possible translation of fsentence.}
-#'    \item{pr}{Translation probability (up to a constant).}
+#' @param max_swap maximum distance away two words can be to consider swapping them during decoding (default 2).
+#' @param numiter number of times heuristics should be tried (default=4). Usually only a couple iterations are needed to find local optimum.
+#' @param verbose If TRUE (default), then print results of each heuristic step to the screen.
+#' @return The best translation in e language found after numiter rounds of heuristics.
 #' @examples
 #' # download english-french sentence pairs
 #' temp = tempfile()
@@ -30,94 +29,186 @@
 #' out = IBM2(e,f,maxiter=50,eps=0.01,init.IBM1=5);
 #'
 #' # possible english translations and their probabilities
-#' translations = decode(out, fsentence="une bière sil vous plaît")
+#' besttranslation = decode(out, fsentence="une bière sil vous plaît")
 #'
-#' # 10 most likely translations
-#' translations = translations[1:10,,drop=FALSE]
-#'
-#' # might be a bit faster to screen translations with IBM1 method first:
-#' translations = decode(out, fsentence="une bière sil vous plaît", useIBM1=TRUE)
 #' @import Matrix
 #' @export
-decode.IBM2 = function(object, fsentence, threshold=0.001, useIBM1=FALSE,
-                        maxlength=length(unlist(stringr::str_split(fsentence, pattern=" ")))  ) {
+decode.IBM2 = function(object, fsentence, max_swap=2, numiter=4, verbose=TRUE) {
 
-  # extract relevant values from tmatrix
-  fsentence = unlist(stringr::str_split(fsentence, pattern=" "))
-  lf = length(fsentence)
-  tmp = object$tmatrix[,fsentence,drop=FALSE]
-  tmp = tmp[rowSums(tmp)>threshold,,drop=FALSE]
+  f_eg = unlist(stringr::str_split(fsentence, pattern=" ")); lf=length(f_eg)
 
-  if (!useIBM1) {
+  # translation matrix relevant to given f sentence
+  tmp = object$tmatrix[,f_eg]
+  tmp = tmp[rowSums(tmp)>=0.1,,drop=FALSE]
 
-    # compute probabilities for all possible sentences of length <= maxlength
-    returnme = data.frame(esentence=character(0), pr=numeric(0))
-    for (le in 1:maxlength) {
-
-      candidates = gtools::permutations(n=nrow(tmp),r=le,v=rownames(tmp),repeats.allowed=TRUE) # use all permutations now!!!!
-      returnme_le = data.frame(esentence=rep("",nrow(candidates)),
-                               pr=rep(-1,nrow(candidates)))
-      for (i in 1:nrow(candidates)) {
-        returnme_le$esentence[i] = stringr::str_flatten(candidates[i,], collapse=" ")
-
-        if (length(object$amatrix) < le) {
-          returnme_le$pr[i] = 0
-        } else if (length(object$amatrix[[le]]) < lf) {
-          returnme_le$pr[i] = 0
-        } else if (is.null(object$amatrix[[le]][[lf]])) {
-          returnme_le$pr[i] = 0
-        } else {
-          returnme_le$pr[i] = prod(colSums(  tmp[candidates[i,],,drop=FALSE]*
-                                               object$amatrix[[le]][[lf]]))
-        }
-
-      } # end for
-
-      returnme = rbind(returnme,returnme_le)
-
-    } # end for
-
-  } else { # useIBM=TRUE
-
-    # get most likely word combos from IBM1 method
-    class(object) = "IBM1"
-    IBM1predictions = decode(object=object, fsentence=fsentence, threshold=threshold, maxlength=maxlength)
-    class(object) = "IBM2"
-
-    # for each IBM1 combo, try all permutations and probabilities using IBM2 method
-    returnme = data.frame(esentence=character(0), pr=numeric(0))
-    for (j in 1:nrow(IBM1predictions)) {
-      esentence   = unlist(stringr::str_split(IBM1predictions$esentence[j], pattern=" "))
-      le          = length(esentence)
-      candidates  = unique(gtools::permutations(n=le,r=le,v=esentence,set=FALSE,repeats.allowed=FALSE))
-      ncand       = nrow(candidates)
-      returnme_le = data.frame(esentence=rep("",ncand), pr=rep(-1,ncand))
-
-      for (i in 1:ncand) {
-        returnme_le$esentence[i] = stringr::str_flatten(candidates[i,], collapse=" ")
-
-        if (length(object$amatrix) < le) {
-          returnme_le$pr[i] = 0
-        } else if (length(object$amatrix[[le]]) < lf) {
-          returnme_le$pr[i] = 0
-        } else if (is.null(object$amatrix[[le]][[lf]])) {
-          returnme_le$pr[i] = 0
-        } else {
-          returnme_le$pr[i] = prod(colSums(  tmp[candidates[i,],,drop=FALSE]*
-                                               object$amatrix[[le]][[lf]]))
-        }
-
-      } # for i
-
-      returnme = rbind(returnme,returnme_le)
-    } # for j
-
+  # find most likely translations for each f word
+  besttrans = list()
+  for (j in 1:lf) {
+    allcand = tmp[,f_eg[j]]
+    besttrans[[j]] = allcand[allcand>=0.1]
   }
 
-  # sort dataframe, drop 0-probabilities, and return
-  returnme = returnme[order(returnme$pr,decreasing=TRUE),]
-  rownames(returnme) = NULL
-  returnme = returnme[returnme$pr>0,,drop=FALSE]
-  return(returnme)
+  # starting point: best translation for each word
+  currentbest = rep("",lf)
+  maporig = 1:lf
+  for (j in 1:lf) {
+    if (length(besttrans[[j]]) > 0) {
+      ewords = names(besttrans[[j]])
+      currentbest[j] = ewords[which.max(besttrans[[j]])]
+    }
+  }
+  maporig = maporig[currentbest!=""]
+  currentbest = currentbest[currentbest!=""]
+  le = length(currentbest)
+  maporig = 1:le
+  if (length(object$amatrix[[le]]) >= lf) {
+    if (!is.null(object$amatrix[[le]][[lf]])) {
+      currentprob = prod(rowSums(tmp[currentbest,f_eg,drop=FALSE]*object$amatrix[[le]][[lf]]))
+    } else {
+      currentprob = 0
+    }
+  } else {
+    currentprob = 0
+  }
+  if(verbose) print(paste0(c("START:", currentbest,"-------- Probability:",currentprob), collapse=" "))
+
+
+  iter = 0
+  lastprob = -1
+  while((iter < numiter) & (currentprob!=lastprob)) {
+
+    lastprob=currentprob
+
+    # heuristic 1: delete a word
+    if (length(object$amatrix[[le-1]]) >= lf ) {
+      if ( !is.null( object$amatrix[[le-1]][[lf]] ) ) {
+        if(verbose) print("----Heuristic 1 (Delete)----")
+        new_i = NULL
+        for (i in 1:le) {
+          new_esen = currentbest[-i]
+          new_prob = prod(rowSums(tmp[new_esen,f_eg,drop=FALSE]*object$amatrix[[le-1]][[lf]]))
+          if(verbose) print(paste0(c(new_esen,"-------- Probability:",new_prob),collapse=" "))
+          if (new_prob > currentprob) {
+            new_i = i
+            currentprob = new_prob
+          }
+        }
+        if (!is.null(new_i)) {
+          maporig = maporig[-new_i]
+          currentbest = currentbest[-new_i]; le = length(currentbest)
+          if(verbose) print(paste0(c("UPDATE:", currentbest,"-------- Probability:",currentprob), collapse=" "))
+        }
+      }
+    }
+
+    # if e sentence still too long, drop "worst" e words
+    while (length(object$amatrix[[le]]) < lf ) {
+      dropme = which.min(sapply(X=besttrans,FUN=max)[maporig])
+      currentbest = currentbest[-dropme]
+      maporig = maporig[-dropme]
+      le = length(currentbest)
+    }
+
+    # heuristic 2: local reordering
+    if(verbose) print("----Heuristic 2 (Local reordering)----")
+    new_i = NULL
+    new_i_swap = NULL
+    for (i in 1:le) {
+      for (dist in 1:max_swap) {
+        if (i + dist <= le) {
+          new_esen = currentbest
+          new_esen[i] = currentbest[i + dist]
+          new_esen[i + dist] = currentbest[i]
+          new_prob = prod(rowSums(tmp[new_esen,f_eg,drop=FALSE]*object$amatrix[[le]][[lf]]))
+          if(verbose) print(paste0(c(new_esen,"-------- Probability:",new_prob),collapse=" "))
+          if (new_prob > currentprob) {
+            new_i = i
+            new_i_swap = i+dist
+            currentprob = new_prob
+          }
+        }
+      }
+    }
+    if (!is.null(new_i)) {
+      maporig_tmp = maporig
+      currentbest_temp = currentbest
+
+      currentbest[new_i] = currentbest_temp[new_i_swap]
+      currentbest[new_i_swap] = currentbest_temp[new_i]
+      maporig[new_i] = maporig_tmp[new_i_swap]
+      maporig[new_i_swap] = maporig_tmp[new_i]
+
+      if(verbose) print(paste0(c("UPDATE:", currentbest,"-------- Probability:",currentprob), collapse=" "))
+    }
+
+    # heuristic 3: swapping a word with alternative translation
+    if(verbose) print("----Heuristic 3 (Swap translations)----")
+    new_i = NULL
+    new_word = ""
+    for (i in 1:le) {
+      for (etry in names(besttrans[[maporig[i]]]) ) {
+        new_esen = currentbest
+        new_esen[i] = etry
+        new_prob = prod(rowSums(tmp[new_esen,f_eg,drop=FALSE]*object$amatrix[[le]][[lf]]))
+        if(verbose) print(paste0(c(new_esen,"-------- Probability:",new_prob),collapse=" "))
+        if (new_prob > currentprob) {
+          new_i = i
+          new_word = etry
+          currentprob = new_prob
+        }
+      }
+    }
+    if (!is.null(new_i)) {
+      currentbest[new_i] = new_word
+      if(verbose) print(paste0(c("UPDATE:", currentbest,"-------- Probability:",currentprob), collapse=" "))
+    }
+
+    # heuristic 4: add a translation word
+    if ( length(object$amatrix[[le+1]]) >= lf )
+      if ( !is.null( object$amatrix[[le+1]][[lf]] ) ) {
+        if(verbose) print("----Heuristic 4 (Add translation)----")
+        new_i = NULL
+        new_word = ""
+        after=0
+        for (i in 1:le) {
+          for (etry in names(besttrans[[maporig[i]]]) ) {
+            new_esen = currentbest
+            new_esen = append(new_esen,etry,after=i)
+            new_prob = prod(rowSums(tmp[new_esen,f_eg,drop=FALSE]*object$amatrix[[le+1]][[lf]]))
+            if(verbose) print(paste0(c(new_esen,"-------- Probability:",new_prob),collapse=" "))
+            if (new_prob > currentprob) {
+              new_i = i
+              new_word = etry
+              after=0
+              currentprob = new_prob
+            }
+
+            if (length(names(besttrans[[maporig[i]]])) > 1) {
+              new_esen = currentbest
+              new_esen = append(new_esen,etry,after=i-1)
+              new_prob = prod(rowSums(tmp[new_esen,f_eg,drop=FALSE]*object$amatrix[[le+1]][[lf]]))
+              if(verbose) print(paste0(c(new_esen,"-------- Probability:",new_prob),collapse=" "))
+              if (new_prob > currentprob) {
+                new_i = i
+                new_word = etry
+                after = -1
+                currentprob = new_prob
+              }
+            }
+          }
+        }
+        if (!is.null(new_i)) {
+          maporig     = append(maporig, maporig[new_i], after=new_i+after)
+          currentbest = append(currentbest, new_word, after=new_i+after)
+          le = length(currentbest)
+          if(verbose) print(paste0(c("UPDATE:", currentbest,"-------- Probability:",currentprob), collapse=" "))
+        }
+      }
+
+    iter = iter + 1
+
+  } # while
+
+  return( paste0(currentbest, collapse = " ") )
 
 } # decode.IBM2

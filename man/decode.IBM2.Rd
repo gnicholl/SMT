@@ -4,37 +4,30 @@
 \alias{decode.IBM2}
 \title{(IBM2) Compute translation probabilities given a foreign sentence.}
 \usage{
-\method{decode}{IBM2}(
-  object,
-  fsentence,
-  threshold = 0.001,
-  useIBM1 = FALSE,
-  maxlength = length(unlist(stringr::str_split(fsentence, pattern = " ")))
-)
+\method{decode}{IBM2}(object, fsentence, max_swap = 2, numiter = 4, verbose = TRUE)
 }
 \arguments{
 \item{object}{result from IBM2()}
 
 \item{fsentence}{sentence in f language you'd like to translate to e language (vector or space-delimited string)}
 
-\item{threshold}{reduce the number of e language words to consider by eliminating ones with Prob<=threshold (default=0.001).}
+\item{max_swap}{maximum distance away two words can be to consider swapping them during decoding (default 2).}
 
-\item{useIBM1}{(default FALSE) If TRUE, use IBM1 decoding method first to find most likely translations based on combinations, then use permutations only of this subset of translations.}
+\item{numiter}{number of times heuristics should be tried (default=4). Usually only a couple iterations are needed to find local optimum.}
 
-\item{maxlength}{only consider e translations which have maxlength words or fewer. By default, will look for translations with the same number of words (or fewer) as fsentence.}
+\item{verbose}{If TRUE (default), then print results of each heuristic step to the screen.}
 }
 \value{
-A data.frame with two columns, sorted in descending order of pr:
-\item{esentence}{Possible translation of fsentence.}
-\item{pr}{Translation probability (up to a constant).}
+The best translation in e language found after numiter rounds of heuristics.
 }
 \description{
-Takes a sentence in a foreign language f and produces a list of possible translations
-in language e and their respective probabilities based on the IBM1 model. Only returns
-translations with probabilities > 0. Currently works by considering all permutations
-(unlike IBM1, order matters, making the list even longer)
-of most likely (based on threshold parameter) words from language e. Thus, caution
-should be taken in predicting very long sentences from language f.
+Takes a sentence in a foreign language f and produces the best translation
+it can find based on IBM2 model. It starts with a word-by-word translation
+into e language. Then it iterates between 4 heuristics: dropping a word,
+reordering words, trying alternate translations of words, or adding
+alternate translations of words. These heuristics are necessary to make
+decoding computationally reasonable, but may result in a local optimum
+rather than a global optimum.
 }
 \examples{
 # download english-french sentence pairs
@@ -51,11 +44,6 @@ f = tolower(stringr::str_squish(tm::removePunctuation(ENFR$fr[1:200])));
 out = IBM2(e,f,maxiter=50,eps=0.01,init.IBM1=5);
 
 # possible english translations and their probabilities
-translations = decode(out, fsentence="une bière sil vous plaît")
+besttranslation = decode(out, fsentence="une bière sil vous plaît")
 
-# 10 most likely translations
-translations = translations[1:10,,drop=FALSE]
-
-# might be a bit faster to screen translations with IBM1 method first:
-translations = decode(out, fsentence="une bière sil vous plaît", useIBM1=TRUE)
 }

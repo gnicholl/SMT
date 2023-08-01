@@ -73,7 +73,6 @@
 #' @import Matrix
 #' @import progress
 #' @importFrom fastmatch fmatch
-#' @export
 IBM4 = function(e, e_wordclass, f, f_wordclass, maxiter=5, eps=0.01, heuristic=TRUE, maxfert=5, init.IBM1=5, init.IBM2=5, init.IBM3=3, sparse=FALSE, fmatch=FALSE) {
 
   # check inputs

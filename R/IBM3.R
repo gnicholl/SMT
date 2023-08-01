@@ -43,7 +43,6 @@
 #' @import Matrix
 #' @import progress
 #' @importFrom fastmatch fmatch
-#' @export
 IBM3 = function(e, f, maxiter=30, eps=0.01, heuristic=TRUE, maxfert=5, init.IBM1=5, init.IBM2=10, sparse=FALSE, fmatch=FALSE) {
 
   # initialize with IBM1 and IBM2
@@ -105,16 +104,12 @@ IBM3 = function(e, f, maxiter=30, eps=0.01, heuristic=TRUE, maxfert=5, init.IBM1
           for (i in 0:lf) {
             a[j] = i # pegging one alignment point
             for (j_prime in (1:le)[-j]) {
-              pr_prev = 0
-              for (i_prime in 0:lf) {
-                if (fmatch) pr_align_IBM2 = t_e_f[fmatch(e_sen[j_prime],tmat_rnames),fmatch(f_sen_null[i_prime],tmat_cnames)]*
-                                             dprob[[le]][[lf]][j_prime,i_prime+1]
-                if (!fmatch)  pr_align_IBM2 = t_e_f[e_sen[j_prime],f_sen_null[i_prime]]*dprob[[le]][[lf]][j_prime,i_prime+1]
-                if (pr_align_IBM2 > pr_prev) {
-                  a[j_prime] = i_prime
-                  pr_prev = pr_align_IBM2
-                }
+              pr_align_IBM2 = function(i_prime) {
+                if (fmatch) return(t_e_f[fmatch(e_sen[j_prime],tmat_rnames),fmatch(f_sen_null[i_prime],tmat_cnames)]*
+                                   dprob[[le]][[lf]][j_prime,i_prime+1])
+                if (!fmatch) return(t_e_f[e_sen[j_prime],f_sen_null[i_prime]]*dprob[[le]][[lf]][j_prime,i_prime+1])
               }
+              a[j_prime] = which.max(sapply(X=0:lf,FUN=pr_align_IBM2)) - 1
             }
 
             # find best candidates close by

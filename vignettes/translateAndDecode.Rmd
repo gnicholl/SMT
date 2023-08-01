@@ -1,0 +1,216 @@
+---
+title: "Replicating Results from 'Can Part-of-Speech Tagging Improve Translation Models?'"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{translateAndDecode}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+# Preliminaries
+
+Install the `SMT` package from GitHub:
+
+```{r , eval=FALSE}
+if (!require("remotes")) install.packages("remotes")
+remotes::install_github("gnicholl/SMT")
+```
+
+Install and load necessary packages:
+
+```{r pkgs , eval=FALSE, message=FALSE}
+if (!require("pacman")) install.packages("pacman")
+pkgs = c("SMT","tm","stringr","progress","Matrix","bench","fastmatch","gtools","udpipe","tidyverse","index0","parallel")
+pacman::p_load(char=pkgs)
+rm(pkgs)
+```
+
+# Data
+
+Download French-English pairs from tatoeba (hosted at manythings.org):
+
+```{r , message=FALSE, warning=FALSE}
+temp = tempfile()
+download.file("http://www.manythings.org/anki/fra-eng.zip", temp, quiet=TRUE)
+ENFR = readr::read_tsv(file=unz(temp,"fra.txt"), col_names=c("en","fr","details"))
+unlink(temp)
+```
+
+Compute length of each sentence, to be used for stratification (WARNING: this takes several minutes!):
+
+```{r}
+ENFR$le = NA
+ENFR$lf = NA
+for (r in 1:nrow(ENFR)) {
+  ENFR$le[r] = length(unlist(stringr::str_split(stringr::str_squish(tm::removePunctuation(ENFR$en[r])), pattern=" ")))
+  ENFR$lf[r] = length(unlist(stringr::str_split(stringr::str_squish(tm::removePunctuation(ENFR$fr[r])), pattern=" ")))
+}
+```
+
+Sample training set, stratifying by length of French sentence:
+
+```{r}
+set.seed(20230128)
+ENFR$id = 1:nrow(ENFR)
+sample_train = NULL
+sampsize = c(400,600,600,600,600,600,600)
+for (fsize in 1:7) {
+  sample_train = c(sample_train, sample(ENFR$id[ENFR$lf==fsize],size=sampsize[fsize]))
+}
+train_data = ENFR[sample_train,]
+```
+
+POS tagging models from udpipe:
+
+```{r }
+m_eng = udpipe::udpipe_download_model(language = "english-ewt")
+m_eng = udpipe::udpipe_load_model(m_eng)
+m_fr = udpipe::udpipe_download_model(language = "french-gsd")
+m_fr = udpipe::udpipe_load_model(m_fr)
+```
+
+Tag all sentences in the training set (WARNING: this takes a couple minutes!):
+
+```{r}
+e_tagged = sapply(X=train_data$en, FUN=SMT::pos.tagger, udpipe.model=m_eng, USE.NAMES=FALSE)
+f_tagged = sapply(X=train_data$fr, FUN=SMT::pos.tagger, udpipe.model=m_fr,  USE.NAMES=FALSE)
+```
+
+Here we create a dictionary of all English and French words seen in the training set:
+
+```{r}
+e_traindict = unique(unlist(stringr::str_split(e_tagged, pattern=" ")))
+f_traindict = unique(unlist(stringr::str_split(f_tagged, pattern=" ")))
+```
+
+Now we create the test set, also stratified by length of French sentence,
+making sure that sampled sentence include only words in the training dictionaries
+(WARNING: takes a minute or so):
+
+```{r}
+set.seed(82103202)
+tmp = ENFR[-sample_train,]
+tmp = tmp[tmp$lf<=7,]
+tmp = tmp[sample(1:nrow(tmp)),]
+
+sample_test = NULL
+successes = c(0,0,0,0,0,0,0)
+sampsize = c(200,300,300,300,300,300,300)
+for (fsize in 1:7) {
+  tmpi = tmp[tmp$lf==fsize,]
+  ind = 1
+  while(successes[fsize] < sampsize[fsize]) {
+    e_try = pos.tagger(sen=tmpi$en[ind],udpipe.model=m_eng)
+    f_try = pos.tagger(sen=tmpi$fr[ind],udpipe.model=m_fr)
+    tryme_e = unique(unlist(stringr::str_split(e_try, pattern=" ")))
+    tryme_f = unique(unlist(stringr::str_split(f_try, pattern=" ")))
+    if (all(tryme_e %in% e_traindict) & all(tryme_f %in% f_traindict)) {
+      successes[fsize] = successes[fsize] + 1
+      sample_test = c(sample_test, tmpi$id[ind])
+    }
+    ind = ind+1
+  }
+  print(ind)
+}
+test_data = ENFR[sample_test,]
+```
+
+POS tagging for the test set (WARNING: takes a minute or so):
+
+```{r}
+e_test_tagged = sapply(X=test_data$en,FUN=pos.tagger,udpipe.model=m_eng, USE.NAMES=FALSE)
+f_test_tagged = sapply(X=test_data$fr,FUN=pos.tagger,udpipe.model=m_fr,  USE.NAMES=FALSE)
+```
+
+
+# Training Translation Models
+
+We train 2 models using IBM-2:
+
+- French-to-English, POS tagged
+- French-to-English, not POS tagged
+
+In each case, we run IBM1 for 10 iterations to get an initial translation matrix
+for IBM2. Then we run IBM2 for 50 iterations.
+
+Each model takes about 30+ minutes to train, so I don't run them here but instead
+load saved versions from the package.
+
+```{r , eval=FALSE}
+#model_FtoE_tagged = 
+#  SMT::IBM2(e=e_tagged, f=f_tagged, maxiter=50,init.IBM1=10,eps=0.01,
+#            sparse=TRUE,fmatch=TRUE)
+#save(model_FtoE_tagged, file="C:/Users/Admin/Dropbox/_Rpkgs_/SMT2/inst/CompExamModels/model_FtoE_tagged.RData")
+#model_FtoE_untagged = 
+#  IBM2(e=gsub("\\[[^][]*]","",e_tagged),f=gsub("\\[[^][]*]","",f_tagged),
+#       maxiter=50, init.IBM1=10, eps=0.01,
+#       sparse=TRUE, fmatch=TRUE)
+#save(model_FtoE_untagged, file="C:/Users/Admin/Dropbox/_Rpkgs_/SMT2/inst/CompExamModels/model_FtoE_untagged.RData")
+```
+
+```{r}
+load(file=system.file("CompExamModels", "model_FtoE_tagged.RData", package = "SMT"))
+load(file=system.file("CompExamModels", "model_FtoE_untagged.RData", package = "SMT"))
+```
+
+
+# Decoding Test Examples
+
+Here we decode input sentences for each model (WARNING: Takes several minutes):
+
+```{r}
+predict_FtoE_tagged = rep("",2000)
+for (i in 1:2000) {
+  predict_FtoE_tagged[i] = decode(model_FtoE_tagged, f=f_test_tagged[i], verbose=FALSE, numiter=10)
+}
+
+predict_FtoE_untagged = rep("",2000)
+for (i in 1:2000) {
+  predict_FtoE_untagged[i] = decode(model_FtoE_untagged, f=gsub("\\[[^][]*]","",f_test_tagged[i]), verbose=FALSE, numiter=10)
+}
+```
+
+
+# Evaluate Model Performance
+
+Now we evaluate model performance:
+
+```{r}
+`%notin%` = Negate(`%in%`)
+
+test_data$TP_FtoE_tagged = NA
+test_data$FP_FtoE_tagged = NA
+for (i in 1:2000) {
+  truth      = unlist(stringr::str_split(gsub("\\[[^][]*]","",e_test_tagged[i]), pattern=" "))
+  predicted  = unlist(stringr::str_split(gsub("\\[[^][]*]","",predict_FtoE_tagged[i]), pattern=" "))
+  test_data$TP_FtoE_tagged[i] = sum(truth %in% predicted) / length(truth)
+  test_data$FP_FtoE_tagged[i] = sum(predicted %notin% truth) / length(predicted)
+}
+
+test_data$TP_FtoE_untagged = NA
+test_data$FP_FtoE_untagged = NA
+for (i in 1:2000) {
+  truth      = unlist(stringr::str_split(gsub("\\[[^][]*]","",e_test_tagged[i]), pattern=" "))
+  predicted  = unlist(stringr::str_split(predict_FtoE_untagged[i], pattern=" "))
+  test_data$TP_FtoE_untagged[i] = sum(truth %in% predicted) / length(truth)
+  test_data$FP_FtoE_untagged[i] = sum(predicted %notin% truth) / length(predicted)
+}
+```
+
+
+Finally, the output:
+
+```{r}
+test_data %>%
+  group_by(lf) %>%
+  summarise_at(c("TP_FtoE_tagged","FP_FtoE_tagged","TP_FtoE_untagged","FP_FtoE_untagged"), mean) 
+```
+
+
