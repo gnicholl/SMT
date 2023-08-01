@@ -25,7 +25,7 @@ remotes::install_github("gnicholl/SMT")
 
 Install and load necessary packages:
 
-```{r pkgs , eval=FALSE, message=FALSE}
+```{r pkgs , message=FALSE}
 if (!require("pacman")) install.packages("pacman")
 pkgs = c("SMT","tm","stringr","progress","Matrix","bench","fastmatch","gtools","udpipe","tidyverse","index0","parallel")
 pacman::p_load(char=pkgs)
