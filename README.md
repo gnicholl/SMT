@@ -18,6 +18,10 @@ possible output words, as IBM1 is unable to distinguish different alignments of 
 For IBM2, in theory one would have to consider all permutations of words.
 Instead I use a simple heuristic involving adding, deleting, and swapping words.
 
+## Vignette
+
+See [here for examples.](https://htmlpreview.github.io/?https://github.com/gnicholl/SMT/blob/main/vignettes/translateAndDecode.html)
+
 ## Help
 
 See `?IBM1`, `?IBM2`, `?decode.IBM1`, `?decode.IBM2` for more details.
