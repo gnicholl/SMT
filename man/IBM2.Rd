@@ -9,10 +9,10 @@ IBM2(
   f,
   maxiter = 30,
   eps = 0.01,
-  init.IBM1 = 2,
-  sparse = FALSE,
-  fmatch = FALSE,
-  cl = NULL
+  init.IBM1 = 10,
+  add.null.token = TRUE,
+  init.tmatrix = NULL,
+  init.amatrix = NULL
 )
 }
 \arguments{
@@ -26,14 +26,14 @@ IBM2(
 
 \item{init.IBM1}{number of iterations (integer>=0) of IBM1 to perform to initialize IBM2 algorithm}
 
-\item{sparse}{If FALSE (default), use base R matrices. If TRUE, use sparseMatrix from the Matrix package.}
+\item{add.null.token}{If TRUE (default), adds \if{html}{\out{<NULL>}} to beginning of each f sentence. Allows e words to be aligned with "nothing".}
 
-\item{fmatch}{If TRUE, use fmatch from fastmatch package for faster lookup. Otherwise use base R lookup.}
+\item{init.tmatrix}{tmatrix from a previous estimation. If not provided, algorithm starts with uniform probabilities.}
 
-\item{cl}{From a parallel:makeCluster. Use to parallelize aspects of the code (only small embarassingly parallel parts). Default is NULL (no parallelization).}
+\item{init.amatrix}{amatrix from a previous estimation. If not provided, algorithm starts with uniform probabilities.}
 }
 \value{
-\item{tmatrix}{Matrix of translation probabilities (cols are words from e, rows are words from f). If sparse=TRUE, tmatrix will be a sparseMatrix from the Matrix package, and will generally take up substantially less memory.}
+\item{tmatrix}{Environment object containing translation probabilities for e-f word pairs. E.g. tmatrix$go$va (equivalently, tmatrix[\link{"go"}][\link{"va"}]) gives the probability of e="go" given f="va".}
 \item{amatrix}{A list of alignment probability matrices. E.g. amatrix[\link{3}][\link{4}] gives the alignment probability matrix for e sentences of length 3 and f sentences of length 4.}
 \item{numiter}{Number of iterations}
 \item{maxiter}{As above}
@@ -53,8 +53,8 @@ ENFR = readr::read_tsv(file=unz(temp,"fra.txt"),col_names=c("en","fr","details")
 unlink(temp);
 
 # a bit of pre-processing
-e = tolower(stringr::str_squish(tm::removePunctuation(ENFR$en[1:200])));
-f = tolower(stringr::str_squish(tm::removePunctuation(ENFR$fr[1:200])));
+e = tolower(stringr::str_squish(tm::removePunctuation(ENFR$en[1:1000])));
+f = tolower(stringr::str_squish(tm::removePunctuation(ENFR$fr[1:1000])));
 
 # IBM1 guarantees global optimum, while IBM2 doesn't => initialize with IBM1.
 # IBM1 also faster, may make IBM2 faster overall.

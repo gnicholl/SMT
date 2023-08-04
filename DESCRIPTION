@@ -19,7 +19,8 @@ Imports:
     index0 (>= 0.0.1),
     progress (>= 1.2.2),
     udpipe (>= 0.8.11),
-    parallel (>= 4.3.0)
+    parallel (>= 4.3.0),
+    ngram (>= 3.2.2)
 Suggests: 
     knitr,
     rmarkdown

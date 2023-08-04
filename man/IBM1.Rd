@@ -4,7 +4,14 @@
 \alias{IBM1}
 \title{IBM1 Model}
 \usage{
-IBM1(e, f, maxiter = 30, eps = 0.01, sparse = FALSE, fmatch = FALSE, cl = NULL)
+IBM1(
+  e,
+  f,
+  maxiter = 30,
+  eps = 0.01,
+  add.null.token = TRUE,
+  init.tmatrix = NULL
+)
 }
 \arguments{
 \item{e}{vector of sentences in language we want to translate to}
@@ -15,17 +22,15 @@ IBM1(e, f, maxiter = 30, eps = 0.01, sparse = FALSE, fmatch = FALSE, cl = NULL)
 
 \item{eps}{convergence criteria for perplexity (i.e. negative log-likelihood)}
 
-\item{sparse}{If FALSE (default), use base R matrices. If TRUE, use sparseMatrix from the Matrix package.}
+\item{add.null.token}{If TRUE (default), adds \if{html}{\out{<NULL>}} to beginning of each f sentence. Allows e words to be aligned with "nothing".}
 
-\item{fmatch}{If TRUE, use fmatch from fastmatch package for faster lookup. Otherwise use base R lookup.}
-
-\item{cl}{From a parallel:makeCluster. Use to parallelize aspects of the code (only small embarassingly parallel parts). Default is NULL (no parallelization).}
+\item{init.tmatrix}{tmatrix from a previous estimation. If not provided, algorithm starts with uniform probabilities.}
 }
 \value{
-\item{tmatrix}{Matrix of translation probabilities (cols are words from e, rows are words from f). If sparse=TRUE, tmatrix will be a sparseMatrix from the Matrix package, and will generally take up substantially less memory.}
+\item{tmatrix}{Environment object containing translation probabilities for e-f word pairs. E.g. tmatrix$go$va (equivalently, tmatrix[\link{"go"}][\link{"va"}]) gives the probability of e="go" given f="va".}
 \item{numiter}{Number of iterations}
-\item{maxiter}{As above}
-\item{eps}{As above}
+\item{maxiter}{The \code{maxiter} argument supplied by the user.}
+\item{eps}{The \code{eps} argument supplied by the user.}
 \item{converged}{TRUE if algorithm stopped once eps criteria met. FALSE otherwise.}
 \item{perplexity}{Final likelihood/perplexity value.}
 \item{time_elapsed}{Time in minutes the algorithm ran for.}
@@ -44,9 +49,9 @@ unlink(temp);
 e = tolower(stringr::str_squish(tm::removePunctuation(ENFR$en[1:200])));
 f = tolower(stringr::str_squish(tm::removePunctuation(ENFR$fr[1:200])));
 
-# try with and without sparseMatrix (slow match)
-test1 = SMT::IBM1(e,f,maxiter=200,eps=0.01,sparse=FALSE,fmatch=FALSE);
-test2 = SMT::IBM1(e,f,maxiter=200,eps=0.01,sparse=TRUE,fmatch=FALSE);
+# models
+initmodel  = SMT::IBM1(e,f,maxiter=5,eps=0.01);
+finalmodel = SMT::IBM1(e,f,maxiter=40,eps=0.01,init.tmatrix=initmodel$tmatrix);
 
 # try with and without sparseMatrix (fast match)
 test3 = SMT::IBM1(e,f,maxiter=200,eps=0.01,sparse=FALSE,fmatch=TRUE);
