@@ -46,9 +46,15 @@ possible output words, as IBM1 is unable to distinguish different alignments of 
 For IBM2, in theory one would have to consider all permutations of words.
 Instead I use a simple heuristic involving adding, deleting, and swapping words.
 
+## Evaluate
+
+Given a list of decoded translations, we then need to evaluate how good they are.
+I provide the `evaluate` function for this purpose, which provides several measures
+decribed in `Koehn (2009)`. See `?evaluate`.
+
 ## Help
 
-See `?IBM1`, `?IBM2`, `?IBM3`, `?decode.IBM1`, `?decode.IBM2` for more details.
+See `?IBM1`, `?IBM2`, `?IBM3`, `?decode.IBM1`, `?decode.IBM2`, `evaluate` for more details.
 
 ## Sources
 
