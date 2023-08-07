@@ -11,35 +11,52 @@ IBM3(
   eps = 0.01,
   heuristic = TRUE,
   maxfert = 5,
-  init.IBM1 = 5,
+  init.IBM1 = 10,
   init.IBM2 = 10,
-  sparse = FALSE,
-  fmatch = FALSE
+  init.tmatrix = NULL,
+  init.amatrix = NULL,
+  init.fmatrix = NULL,
+  init.dmatrix = NULL,
+  init.p_null = NULL,
+  verbose = 0.5,
+  samplemethod = 1
 )
 }
 \arguments{
-\item{e}{vector of sentences in language we want to translate to}
+\item{e}{vector of sentences in language we want to translate to. Function assumes sentences are space-delimited.}
 
-\item{f}{vector of sentences in language we want to translate from}
+\item{f}{vector of sentences in language we want to translate from. Function assumes sentences are space-delimited.}
 
 \item{maxiter}{max number of EM iterations allowed}
 
 \item{eps}{convergence criteria for perplexity (i.e. negative log-likelihood)}
 
-\item{heuristic}{If TRUE (default) use a heuristic hill-climbing algorithm to find most likely alignments. If FALSE, search over all alignments (not recommended unless only looking at small sentences.)}
+\item{heuristic}{If TRUE (default) use a heuristic hill-climbing algorithm to find most likely alignments. If FALSE, search over all alignments (not recommended unless only looking at short sentences). Sentences that are length 3 or smaller with always search over all alignments, even if heuristic=TRUE.}
 
-\item{maxfert}{Maximum number of e words ("fertility") which an f word is allowed to be mapped to. The default is 5. In practice fertility tends to be small, so this number should normally be sufficient.}
+\item{maxfert}{Maximum number of e words ("fertility") to which an f word can be aligned. The default is 5.}
 
 \item{init.IBM1}{number of iterations (integer>=0) of IBM1 to perform to initialize IBM2 algorithm}
 
 \item{init.IBM2}{number of iterations (integer>=0) of IBM2 to perform to initialize IBM3 algorithm}
 
-\item{sparse}{If TRUE, uses sparse matrices from Matrix package (default FALSE).}
+\item{init.tmatrix}{tmatrix from a previous estimation. Used to initialize IBM1 (if \code{init.IBM1}>0), IBM2 (if \code{init.IBM2} >0), or IBM3 otherwise. If not provided, algorithm starts with uniform probabilities.}
+
+\item{init.amatrix}{amatrix from a previous estimation. Used to initialize IBM2 if \code{init.IBM2} >0. If not provided, algorithm starts with uniform probabilities.}
+
+\item{init.fmatrix}{fmatrix from a previous estimation. Used to initialize IBM3. If not provided, algorithm starts with uniform probabilities.}
+
+\item{init.dmatrix}{dmatrix from a previous estimation. Used to initialize IBM3. If not provided, algorithm starts with uniform probabilities.}
+
+\item{init.p_null}{p_null  from a previous estimation. Used to initialize IBM3. If not provided, algorithm starts with \code{p_null=0.5}.}
+
+\item{verbose}{If 1, shows progress bar for each iteration, and a summary when each iteration is complete. If 0.5 (default), only shows the summary without progress bars. If 0, shows nothing.}
+
+\item{samplemethod}{If 1 (default) uses the standard hillclimbing algorithm but without pegging. If 2, uses my own heuristic which considers all alignments where translation probabilities between input and output words are >1e-30. This is faster as long as many of the translation probabilities are 0.}
 }
 \value{
 \item{tmatrix}{Matrix of translation probabilities (cols are words from e, rows are words from f). If sparse=TRUE, tmatrix will be a sparseMatrix from the Matrix package, and will generally take up substantially less memory.}
 \item{dmatrix}{A list of distortion probability matrices. E.g. dmatrix[\link{3}][\link{4}] gives the distortion probability matrix for e sentences of length 3 and f sentences of length 4.}
-\item{fertmatrix}{Matrix of fertility probabilities.}
+\item{fmatrix}{Matrix of fertility probabilities.}
 \item{p_null}{Probability of NULL token insertion.}
 \item{numiter}{Number of iterations}
 \item{maxiter}{As above}
@@ -49,7 +66,10 @@ IBM3(
 \item{time_elapsed}{Time in minutes the algorithm ran for.}
 }
 \description{
-The third SMT model from Brown et al. (1993)
+The third SMT model from Brown et al. (1993). Note that, unlike IBM1 and IBM2 functions,
+NULL insertion is always assumed and cannot be turned off. Note also that I use
+the basic hill climbing algorithm, and do not use pegging to increase the number
+of alignments considered.
 }
 \examples{
 # download english-french sentence pairs
@@ -63,6 +83,6 @@ e = tolower(stringr::str_squish(tm::removePunctuation(ENFR$en[1:200])));
 f = tolower(stringr::str_squish(tm::removePunctuation(ENFR$fr[1:200])));
 
 # a model
-model3 = IBM3(e=e,f=f,maxiter=10, init.IBM1=10, init.IBM2=20)
+model = IBM3(e=e,f=f,maxiter=10, init.IBM1=10, init.IBM2=20)
 
 }

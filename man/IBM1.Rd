@@ -10,13 +10,14 @@ IBM1(
   maxiter = 30,
   eps = 0.01,
   add.null.token = TRUE,
-  init.tmatrix = NULL
+  init.tmatrix = NULL,
+  verbose = 0.5
 )
 }
 \arguments{
-\item{e}{vector of sentences in language we want to translate to}
+\item{e}{vector of sentences in language we want to translate to. Function assumes sentences are space-delimited.}
 
-\item{f}{vector of sentences in language we want to translate from}
+\item{f}{vector of sentences in language we want to translate from. Function assumes sentences are space-delimited.}
 
 \item{maxiter}{max number of EM iterations allowed}
 
@@ -25,6 +26,8 @@ IBM1(
 \item{add.null.token}{If TRUE (default), adds \if{html}{\out{<NULL>}} to beginning of each f sentence. Allows e words to be aligned with "nothing".}
 
 \item{init.tmatrix}{tmatrix from a previous estimation. If not provided, algorithm starts with uniform probabilities.}
+
+\item{verbose}{If 1, shows progress bar for each iteration, and a summary when each iteration is complete. If 0.5 (default), only shows the summary without progress bars. If 0, shows nothing.}
 }
 \value{
 \item{tmatrix}{Environment object containing translation probabilities for e-f word pairs. E.g. tmatrix$go$va (equivalently, tmatrix[\link{"go"}][\link{"va"}]) gives the probability of e="go" given f="va".}
@@ -46,14 +49,10 @@ ENFR = readr::read_tsv(file=unz(temp,"fra.txt"),col_names=c("en","fr","details")
 unlink(temp);
 
 # a bit of pre-processing
-e = tolower(stringr::str_squish(tm::removePunctuation(ENFR$en[1:200])));
-f = tolower(stringr::str_squish(tm::removePunctuation(ENFR$fr[1:200])));
+e = tolower(stringr::str_squish(tm::removePunctuation(ENFR$en[1:1000])));
+f = tolower(stringr::str_squish(tm::removePunctuation(ENFR$fr[1:1000])));
 
 # models
 initmodel  = SMT::IBM1(e,f,maxiter=5,eps=0.01);
 finalmodel = SMT::IBM1(e,f,maxiter=40,eps=0.01,init.tmatrix=initmodel$tmatrix);
-
-# try with and without sparseMatrix (fast match)
-test3 = SMT::IBM1(e,f,maxiter=200,eps=0.01,sparse=FALSE,fmatch=TRUE);
-test4 = SMT::IBM1(e,f,maxiter=200,eps=0.01,sparse=TRUE,fmatch=TRUE);
 }

@@ -2,14 +2,15 @@
 #' IBM2 Model
 #'
 #' The second SMT model from Brown et al. (1993)
-#' @param e vector of sentences in language we want to translate to
-#' @param f vector of sentences in language we want to translate from
+#' @param e vector of sentences in language we want to translate to. Function assumes sentences are space-delimited.
+#' @param f vector of sentences in language we want to translate from. Function assumes sentences are space-delimited.
 #' @param maxiter max number of EM iterations allowed
 #' @param eps convergence criteria for perplexity (i.e. negative log-likelihood)
 #' @param init.IBM1 number of iterations (integer>=0) of IBM1 to perform to initialize IBM2 algorithm
 #' @param add.null.token If TRUE (default), adds <NULL> to beginning of each f sentence. Allows e words to be aligned with "nothing".
 #' @param init.tmatrix tmatrix from a previous estimation. If not provided, algorithm starts with uniform probabilities.
 #' @param init.amatrix amatrix from a previous estimation. If not provided, algorithm starts with uniform probabilities.
+#' @param verbose If 1, shows progress bar for each iteration, and a summary when each iteration is complete. If 0.5 (default), only shows the summary without progress bars. If 0, shows nothing.
 #' @return
 #'    \item{tmatrix}{Environment object containing translation probabilities for e-f word pairs. E.g. tmatrix$go$va (equivalently, tmatrix[["go"]][["va"]]) gives the probability of e="go" given f="va".}
 #'    \item{amatrix}{A list of alignment probability matrices. E.g. amatrix[[3]][[4]] gives the alignment probability matrix for e sentences of length 3 and f sentences of length 4.}
@@ -31,19 +32,24 @@
 #' f = tolower(stringr::str_squish(tm::removePunctuation(ENFR$fr[1:1000])));
 #'
 #' # IBM1 guarantees global optimum, while IBM2 doesn't => initialize with IBM1.
-#' # IBM1 also faster, may make IBM2 faster overall.
+#' # IBM1 also a bit faster, may make IBM2 a bit faster overall.
 #' # Experiment with number of initial IBM1 iterations:
 #' test0 = SMT::IBM2(e,f,maxiter=50,eps=0.01,init.IBM1=0);
-#' test1 = SMT::IBM2(e,f,maxiter=50,eps=0.01,init.IBM1=1);
-#' test2 = SMT::IBM2(e,f,maxiter=50,eps=0.01,init.IBM1=2);
-#' test3 = SMT::IBM2(e,f,maxiter=50,eps=0.01,init.IBM1=3);
+#' test1 = SMT::IBM2(e,f,maxiter=50,eps=0.01,init.IBM1=5);
+#' test2 = SMT::IBM2(e,f,maxiter=50,eps=0.01,init.IBM1=10);
+#' test3 = SMT::IBM2(e,f,maxiter=50,eps=0.01,init.IBM1=15);
+#'
+#' # You can initialize IBM2 yourself using a previous IBM1 model:
+#' initmodel = IBM1(e,f,maxiter=15,eps=0.01)
+#' finalmodel = IBM2(e,f,maxiter=30,eps=0.01,init.IBM1=0,init.tmatrix=initmodel$tmatrix)
+#' @import progress
 #' @export
-IBM2 = function(e,f,maxiter=30,eps=0.01,init.IBM1=10,add.null.token=TRUE,init.tmatrix=NULL,init.amatrix=NULL) {
+IBM2 = function(e,f,maxiter=30,eps=0.01,init.IBM1=10,add.null.token=TRUE,init.tmatrix=NULL,init.amatrix=NULL,verbose=0.5) {
 
   start_time = Sys.time()
-  print(paste0("------running ",init.IBM1," iterations of IBM1-------"))
-  out_IBM1 = IBM1_v2(e=e,f=f,maxiter=init.IBM1,eps=eps,add.null.token=add.null.token,init.tmatrix=init.tmatrix)
-  print(paste0("------running ",maxiter," iterations of IBM2-------"))
+  if(verbose>=0.5) print(paste0("------running ",init.IBM1," iterations of IBM1-------"))
+  out_IBM1 = IBM1(e=e,f=f,maxiter=init.IBM1,eps=eps,add.null.token=add.null.token,init.tmatrix=init.tmatrix,verbose=verbose)
+  if(verbose>=0.5) print(paste0("------running ",maxiter," iterations of IBM2-------"))
 
   # add NULL token
   if (add.null.token) f = paste0("<NULL> ",f)
@@ -100,7 +106,7 @@ IBM2 = function(e,f,maxiter=30,eps=0.01,init.IBM1=10,add.null.token=TRUE,init.tm
 
   # initial setup message
   time_elapsed = round(difftime(Sys.time(),start_time,units='min'),3)
-  print(paste0("initial setup ;;; time elapsed: ",time_elapsed,"min"))
+  if(verbose>=0.5) print(paste0("initial setup ;;; time elapsed: ",time_elapsed,"min"))
 
   # EM algorithm
   iter = 1
@@ -108,6 +114,10 @@ IBM2 = function(e,f,maxiter=30,eps=0.01,init.IBM1=10,add.null.token=TRUE,init.tm
   total_perplex = Inf
   while (iter<=maxiter & abs(total_perplex - prev_perplex)>eps) {
 
+    # E step
+    if (verbose==1) pb = progress_bar$new(total=n,clear=TRUE,
+                      format=paste0("iter: ",iter," (E-step) [:bar] :current/:total (eta: :eta)")  )
+    if (verbose==1) pb$tick(0)
     for (s in 1:n) {
 
       e_sen = e_sentences[[s]]; le = length(e_sen)
@@ -135,19 +145,26 @@ IBM2 = function(e,f,maxiter=30,eps=0.01,init.IBM1=10,add.null.token=TRUE,init.tm
         }
       }
 
+      if(verbose==1) if( i==round(k*n/10) ) pb$tick(round(n/10)); k = k+1
     } # end for i in 1:n
-
+    if (verbose==1) pb$terminate()
 
     # M Step, and reset counts to 0
+    if (verbose==1) pb = progress_bar$new(total=n_eword+n_fword,clear=TRUE,
+                      format=paste0("iter: ",iter," (M-step) [:bar] :current/:total (eta: :eta)")  )
+    if (verbose==1) pb$tick(0)
     for (eword in e_allwords) {
       for (fword in ls(t_e_f[[eword]])) {
         t_e_f[[eword]][[fword]] = c_e_f[[eword]][[fword]] / total_f[[fword]]
         c_e_f[[eword]][[fword]] = 0
       }
+      if(verbose==1) if( i==round(k*(n_eword+n_fword)/10) ) pb$tick(round((n_eword+n_fword)/10)); k = k+1
     }
     for (fword in f_allwords) {
       total_f[[fword]] = 0
+      if(verbose==1) if( i==round(k*(n_eword+n_fword)/10) ) pb$tick(round((n_eword+n_fword)/10)); k = k+1
     }
+    if (verbose==1) pb$terminate()
 
     # update a probs, reset counts
     for (k in 1:nrow(combos)) {
@@ -158,6 +175,9 @@ IBM2 = function(e,f,maxiter=30,eps=0.01,init.IBM1=10,add.null.token=TRUE,init.tm
     }
 
     # compute perplexity
+    if (verbose==1) pb = progress_bar$new(total=n,clear=TRUE,
+                      format=paste0("iter: ",iter," (perplexity) [:bar] :current/:total (eta: :eta)")  )
+    if (verbose==1) pb$tick(0)
     prev_perplex = total_perplex
     total_perplex = 0
     for (s in 1:n) {
@@ -173,11 +193,13 @@ IBM2 = function(e,f,maxiter=30,eps=0.01,init.IBM1=10,add.null.token=TRUE,init.tm
         }
         total_perplex = total_perplex - log(tmp)
       }
+
+      if(verbose==1) if( i==round(k*n/10) ) pb$tick(round(n/10)); k = k+1
     }
 
 
     time_elapsed = round(difftime(Sys.time(),start_time,units='min'),3)
-    print(paste0("iter: ",iter,"; perplexity value: ",total_perplex, "; time elapsed: ",time_elapsed,"min"))
+    if(verbose>=0.5) print(paste0("iter: ",iter,"; perplexity value: ",total_perplex, "; time elapsed: ",time_elapsed,"min"))
 
     iter = iter + 1
 

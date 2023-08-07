@@ -12,13 +12,14 @@ IBM2(
   init.IBM1 = 10,
   add.null.token = TRUE,
   init.tmatrix = NULL,
-  init.amatrix = NULL
+  init.amatrix = NULL,
+  verbose = 0.5
 )
 }
 \arguments{
-\item{e}{vector of sentences in language we want to translate to}
+\item{e}{vector of sentences in language we want to translate to. Function assumes sentences are space-delimited.}
 
-\item{f}{vector of sentences in language we want to translate from}
+\item{f}{vector of sentences in language we want to translate from. Function assumes sentences are space-delimited.}
 
 \item{maxiter}{max number of EM iterations allowed}
 
@@ -31,6 +32,8 @@ IBM2(
 \item{init.tmatrix}{tmatrix from a previous estimation. If not provided, algorithm starts with uniform probabilities.}
 
 \item{init.amatrix}{amatrix from a previous estimation. If not provided, algorithm starts with uniform probabilities.}
+
+\item{verbose}{If 1, shows progress bar for each iteration, and a summary when each iteration is complete. If 0.5 (default), only shows the summary without progress bars. If 0, shows nothing.}
 }
 \value{
 \item{tmatrix}{Environment object containing translation probabilities for e-f word pairs. E.g. tmatrix$go$va (equivalently, tmatrix[\link{"go"}][\link{"va"}]) gives the probability of e="go" given f="va".}
@@ -57,10 +60,14 @@ e = tolower(stringr::str_squish(tm::removePunctuation(ENFR$en[1:1000])));
 f = tolower(stringr::str_squish(tm::removePunctuation(ENFR$fr[1:1000])));
 
 # IBM1 guarantees global optimum, while IBM2 doesn't => initialize with IBM1.
-# IBM1 also faster, may make IBM2 faster overall.
+# IBM1 also a bit faster, may make IBM2 a bit faster overall.
 # Experiment with number of initial IBM1 iterations:
 test0 = SMT::IBM2(e,f,maxiter=50,eps=0.01,init.IBM1=0);
-test1 = SMT::IBM2(e,f,maxiter=50,eps=0.01,init.IBM1=1);
-test2 = SMT::IBM2(e,f,maxiter=50,eps=0.01,init.IBM1=2);
-test3 = SMT::IBM2(e,f,maxiter=50,eps=0.01,init.IBM1=3);
+test1 = SMT::IBM2(e,f,maxiter=50,eps=0.01,init.IBM1=5);
+test2 = SMT::IBM2(e,f,maxiter=50,eps=0.01,init.IBM1=10);
+test3 = SMT::IBM2(e,f,maxiter=50,eps=0.01,init.IBM1=15);
+
+# You can initialize IBM2 yourself using a previous IBM1 model:
+initmodel = IBM1(e,f,maxiter=15,eps=0.01)
+finalmodel = IBM2(e,f,maxiter=30,eps=0.01,init.IBM1=0,init.tmatrix=initmodel$tmatrix)
 }
