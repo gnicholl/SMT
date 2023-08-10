@@ -6,8 +6,8 @@
 #' NULL insertion is always assumed and cannot be turned off. Note also that I use
 #' the basic hill climbing algorithm, and do not use pegging to increase the number
 #' of alignments considered.
-#' @param e vector of sentences in language we want to translate to. Function assumes sentences are space-delimited.
-#' @param f vector of sentences in language we want to translate from. Function assumes sentences are space-delimited.
+#' @param target vector of sentences in language we want to translate to. Function assumes sentences are space-delimited.
+#' @param source vector of sentences in language we want to translate from. Function assumes sentences are space-delimited.
 #' @param maxiter max number of EM iterations allowed
 #' @param eps convergence criteria for perplexity (i.e. negative log-likelihood)
 #' @param heuristic If TRUE (default) use a heuristic hill-climbing algorithm to find most likely alignments. If FALSE, search over all alignments (not recommended unless only looking at short sentences). Sentences that are length 3 or smaller with always search over all alignments, even if heuristic=TRUE.
@@ -22,9 +22,9 @@
 #' @param verbose If 1, shows progress bar for each iteration, and a summary when each iteration is complete. If 0.5 (default), only shows the summary without progress bars. If 0, shows nothing.
 #' @param samplemethod If 1 (default) uses the standard hillclimbing algorithm but without pegging. If 2, uses my own heuristic which considers all alignments where translation probabilities between input and output words are >1e-30. This is faster as long as many of the translation probabilities are 0.
 #' @return
-#'    \item{tmatrix}{Matrix of translation probabilities (cols are words from e, rows are words from f). If sparse=TRUE, tmatrix will be a sparseMatrix from the Matrix package, and will generally take up substantially less memory.}
+#'    \item{tmatrix}{Environment object containing translation probabilities for target-source word pairs. E.g. tmatrix$go$va (equivalently, tmatrix[["go"]][["va"]]) gives the probability of target="go" given source="va".}
 #'    \item{dmatrix}{A list of distortion probability matrices. E.g. dmatrix[[3]][[4]] gives the distortion probability matrix for e sentences of length 3 and f sentences of length 4.}
-#'    \item{fmatrix}{Matrix of fertility probabilities.}
+#'    \item{fmatrix}{Environment object containing vectors of fertility probabilities for each source word. E.g. fmatrix[["va"]][1] is probability that "va" is aligned with 0 words. fmatrix[["va"]][3] is probability "va" is aligned with 2 words. Each vector is length `maxfert+1`.}
 #'    \item{p_null}{Probability of NULL token insertion.}
 #'    \item{numiter}{Number of iterations}
 #'    \item{maxiter}{As above}
@@ -44,11 +44,11 @@
 #' f = tolower(stringr::str_squish(tm::removePunctuation(ENFR$fr[1:200])));
 #'
 #' # a model
-#' model = IBM3(e=e,f=f,maxiter=10, init.IBM1=10, init.IBM2=20)
+#' model = IBM3(e,f,maxiter=10, init.IBM1=10, init.IBM2=20)
 #'
 #' @import progress
 #' @export
-IBM3 = function(e, f, maxiter=30, eps=0.01, heuristic=TRUE, maxfert=5,
+IBM3 = function(target, source, maxiter=30, eps=0.01, heuristic=TRUE, maxfert=5,
                 init.IBM1=10, init.IBM2=10,
                 init.tmatrix=NULL, init.amatrix=NULL, init.fmatrix=NULL, init.dmatrix=NULL, init.p_null=NULL,
                 verbose=0.5, samplemethod=1)
@@ -59,11 +59,12 @@ IBM3 = function(e, f, maxiter=30, eps=0.01, heuristic=TRUE, maxfert=5,
 
   # initialize with IBM1 and IBM2
   start_time = Sys.time()
-  out_IBM2 = IBM2(e=e,f=f,eps=eps,maxiter=init.IBM2,init.IBM1=init.IBM1,add.null.token=TRUE,init.tmatrix=init.tmatrix,init.amatrix=init.amatrix,verbose=verbose)
+  out_IBM2 = IBM2(target=target,source=source,eps=eps,maxiter=init.IBM2,init.IBM1=init.IBM1,add.null.token=TRUE,init.tmatrix=init.tmatrix,init.amatrix=init.amatrix,verbose=verbose)
   if(verbose>=0.5) print(paste0("------running ",maxiter," iterations of IBM3-------"))
 
   # add NULL token
-  f = paste0("<NULL> ",f)
+  e = target
+  f = paste0("<NULL> ",source)
 
   ### HELPER FUNCTIONS #########################################################
   move = function(a, i, j) {
