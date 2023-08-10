@@ -5,8 +5,8 @@
 \title{IBM1 Model}
 \usage{
 IBM1(
-  e,
-  f,
+  target,
+  source,
   maxiter = 30,
   eps = 0.01,
   add.null.token = TRUE,
@@ -15,28 +15,29 @@ IBM1(
 )
 }
 \arguments{
-\item{e}{vector of sentences in language we want to translate to. Function assumes sentences are space-delimited.}
+\item{target}{vector of sentences in language we want to translate to. Function assumes sentences are space-delimited.}
 
-\item{f}{vector of sentences in language we want to translate from. Function assumes sentences are space-delimited.}
+\item{source}{vector of sentences in language we want to translate from. Function assumes sentences are space-delimited.}
 
 \item{maxiter}{max number of EM iterations allowed}
 
 \item{eps}{convergence criteria for perplexity (i.e. negative log-likelihood)}
 
-\item{add.null.token}{If TRUE (default), adds \if{html}{\out{<NULL>}} to beginning of each f sentence. Allows e words to be aligned with "nothing".}
+\item{add.null.token}{If TRUE (default), adds \if{html}{\out{<NULL>}} to beginning of each source sentence. Allows target words to be aligned with "nothing".}
 
 \item{init.tmatrix}{tmatrix from a previous estimation. If not provided, algorithm starts with uniform probabilities.}
 
 \item{verbose}{If 1, shows progress bar for each iteration, and a summary when each iteration is complete. If 0.5 (default), only shows the summary without progress bars. If 0, shows nothing.}
 }
 \value{
-\item{tmatrix}{Environment object containing translation probabilities for e-f word pairs. E.g. tmatrix$go$va (equivalently, tmatrix[\link{"go"}][\link{"va"}]) gives the probability of e="go" given f="va".}
+\item{tmatrix}{Environment object containing translation probabilities for target-source word pairs. E.g. tmatrix$go$va (equivalently, tmatrix[\link{"go"}][\link{"va"}]) gives the probability of target="go" given source="va".}
 \item{numiter}{Number of iterations}
 \item{maxiter}{The \code{maxiter} argument supplied by the user.}
 \item{eps}{The \code{eps} argument supplied by the user.}
 \item{converged}{TRUE if algorithm stopped once eps criteria met. FALSE otherwise.}
 \item{perplexity}{Final likelihood/perplexity value.}
 \item{time_elapsed}{Time in minutes the algorithm ran for.}
+\item{corpus}{data frame containing the target and source sentences and their lengths}
 }
 \description{
 The simplest SMT model from Brown et al. (1993)

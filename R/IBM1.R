@@ -3,21 +3,22 @@
 #' IBM1 Model
 #'
 #' The simplest SMT model from Brown et al. (1993)
-#' @param e vector of sentences in language we want to translate to. Function assumes sentences are space-delimited.
-#' @param f vector of sentences in language we want to translate from. Function assumes sentences are space-delimited.
+#' @param target vector of sentences in language we want to translate to. Function assumes sentences are space-delimited.
+#' @param source vector of sentences in language we want to translate from. Function assumes sentences are space-delimited.
 #' @param maxiter max number of EM iterations allowed
 #' @param eps convergence criteria for perplexity (i.e. negative log-likelihood)
-#' @param add.null.token If TRUE (default), adds <NULL> to beginning of each f sentence. Allows e words to be aligned with "nothing".
+#' @param add.null.token If TRUE (default), adds <NULL> to beginning of each source sentence. Allows target words to be aligned with "nothing".
 #' @param init.tmatrix tmatrix from a previous estimation. If not provided, algorithm starts with uniform probabilities.
 #' @param verbose If 1, shows progress bar for each iteration, and a summary when each iteration is complete. If 0.5 (default), only shows the summary without progress bars. If 0, shows nothing.
 #' @return
-#'    \item{tmatrix}{Environment object containing translation probabilities for e-f word pairs. E.g. tmatrix$go$va (equivalently, tmatrix[["go"]][["va"]]) gives the probability of e="go" given f="va".}
+#'    \item{tmatrix}{Environment object containing translation probabilities for target-source word pairs. E.g. tmatrix$go$va (equivalently, tmatrix[["go"]][["va"]]) gives the probability of target="go" given source="va".}
 #'    \item{numiter}{Number of iterations}
 #'    \item{maxiter}{The `maxiter` argument supplied by the user.}
 #'    \item{eps}{The `eps` argument supplied by the user.}
 #'    \item{converged}{TRUE if algorithm stopped once eps criteria met. FALSE otherwise.}
 #'    \item{perplexity}{Final likelihood/perplexity value.}
 #'    \item{time_elapsed}{Time in minutes the algorithm ran for.}
+#'    \item{corpus}{data frame containing the target and source sentences and their lengths}
 #' @examples
 #' # download english-french sentence pairs
 #' temp = tempfile()
@@ -34,7 +35,7 @@
 #' finalmodel = SMT::IBM1(e,f,maxiter=40,eps=0.01,init.tmatrix=initmodel$tmatrix);
 #' @import progress
 #' @export
-IBM1 = function(e,f,maxiter=30,eps=0.01,add.null.token=TRUE,init.tmatrix=NULL,verbose=0.5) {
+IBM1 = function(target,source,maxiter=30,eps=0.01,add.null.token=TRUE,init.tmatrix=NULL,verbose=0.5) {
 
   # error checking
   stopifnot(maxiter>=0,eps>0,add.null.token %in% c(TRUE,FALSE), verbose %in% c(0,0.5,1),
@@ -44,21 +45,21 @@ IBM1 = function(e,f,maxiter=30,eps=0.01,add.null.token=TRUE,init.tmatrix=NULL,ve
   start_time = Sys.time()
 
   # add NULL token
-  if (add.null.token) f = paste0("<NULL> ",f)
+  if (add.null.token) source = paste0("<NULL> ",source)
 
   # some things we'll need repeatedly
   # split sentences into words
-  e_sentences = lapply(X=e,FUN=function(s) unlist(stringr::str_split(s, " ")))
-  f_sentences = lapply(X=f,FUN=function(s) unlist(stringr::str_split(s, " ")))
+  e_sentences = lapply(X=target,FUN=function(s) unlist(stringr::str_split(s, " ")))
+  f_sentences = lapply(X=source,FUN=function(s) unlist(stringr::str_split(s, " ")))
 
   # list of all unique words
-  e_allwords = unique(unlist(stringr::str_split(e, pattern=" ")))
-  f_allwords = unique(unlist(stringr::str_split(f, pattern=" ")))
+  e_allwords = unique(unlist(stringr::str_split(target, pattern=" ")))
+  f_allwords = unique(unlist(stringr::str_split(source, pattern=" ")))
   n = length(e_sentences); n_eword = length(e_allwords); n_fword = length(f_allwords)
   # perplexity calculation stuff
-  e_lengths = sapply(X=1:n, FUN=function(i) length(e_sentences[[i]]) )
-  f_loglengths = sapply(X=1:n, FUN=function(i) log(length(f_sentences[[i]])) )
-  perp_const = sum(e_lengths*f_loglengths)
+  target_lengths = sapply(X=1:n, FUN=function(i) length(e_sentences[[i]]) )
+  source_lengths = sapply(X=1:n, FUN=function(i) length(f_sentences[[i]]) )
+  perp_const = sum(target_lengths*log(source_lengths))
 
   # initialize matrices
   if (is.null(init.tmatrix))  t_e_f = new.env()
@@ -165,7 +166,7 @@ IBM1 = function(e,f,maxiter=30,eps=0.01,add.null.token=TRUE,init.tmatrix=NULL,ve
     iter = iter + 1
 
   } # end while
-
+  corpus = data.frame(target, source, target_lengths, source_lengths)
   retobj = list(
     "tmatrix"=t_e_f,
     "numiter"=iter-1,
@@ -173,7 +174,8 @@ IBM1 = function(e,f,maxiter=30,eps=0.01,add.null.token=TRUE,init.tmatrix=NULL,ve
     "eps"=eps,
     "converged"=abs(total_perplex - prev_perplex)<=eps,
     "perplexity"=total_perplex,
-    "time_elapsed"=time_elapsed
+    "time_elapsed"=time_elapsed,
+    "corpus"=corpus
   )
   class(retobj) = "IBM1"
   return(retobj)

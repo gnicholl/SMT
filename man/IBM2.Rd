@@ -5,8 +5,8 @@
 \title{IBM2 Model}
 \usage{
 IBM2(
-  e,
-  f,
+  target,
+  source,
   maxiter = 30,
   eps = 0.01,
   init.IBM1 = 10,
@@ -17,9 +17,9 @@ IBM2(
 )
 }
 \arguments{
-\item{e}{vector of sentences in language we want to translate to. Function assumes sentences are space-delimited.}
+\item{target}{vector of sentences in language we want to translate to. Function assumes sentences are space-delimited.}
 
-\item{f}{vector of sentences in language we want to translate from. Function assumes sentences are space-delimited.}
+\item{source}{vector of sentences in language we want to translate from. Function assumes sentences are space-delimited.}
 
 \item{maxiter}{max number of EM iterations allowed}
 
@@ -27,17 +27,17 @@ IBM2(
 
 \item{init.IBM1}{number of iterations (integer>=0) of IBM1 to perform to initialize IBM2 algorithm}
 
-\item{add.null.token}{If TRUE (default), adds \if{html}{\out{<NULL>}} to beginning of each f sentence. Allows e words to be aligned with "nothing".}
+\item{add.null.token}{If TRUE (default), adds \if{html}{\out{<NULL>}} to beginning of each source sentence. Allows target words to be aligned with "nothing".}
 
-\item{init.tmatrix}{tmatrix from a previous estimation. If not provided, algorithm starts with uniform probabilities.}
+\item{init.tmatrix}{tmatrix from a previous estimation to be fed to IBM1 algorithm. If not provided, algorithm starts with uniform probabilities.}
 
 \item{init.amatrix}{amatrix from a previous estimation. If not provided, algorithm starts with uniform probabilities.}
 
 \item{verbose}{If 1, shows progress bar for each iteration, and a summary when each iteration is complete. If 0.5 (default), only shows the summary without progress bars. If 0, shows nothing.}
 }
 \value{
-\item{tmatrix}{Environment object containing translation probabilities for e-f word pairs. E.g. tmatrix$go$va (equivalently, tmatrix[\link{"go"}][\link{"va"}]) gives the probability of e="go" given f="va".}
-\item{amatrix}{A list of alignment probability matrices. E.g. amatrix[\link{3}][\link{4}] gives the alignment probability matrix for e sentences of length 3 and f sentences of length 4.}
+\item{tmatrix}{Environment object containing translation probabilities for target-source word pairs. E.g. tmatrix$go$va (equivalently, tmatrix[\link{"go"}][\link{"va"}]) gives the probability of target="go" given source="va".}
+\item{amatrix}{A list of alignment probability matrices. E.g. amatrix[\link{3}][\link{4}] gives the alignment probability matrix for target sentences of length 3 and source sentences of length 4.}
 \item{numiter}{Number of iterations}
 \item{maxiter}{As above}
 \item{eps}{As above}

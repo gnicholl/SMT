@@ -1,6 +1,18 @@
 
 
 #' @export
+object.size = function(x) {
+  if (class(x)=="IBM1") {
+    object.size.IBM1(x)
+  } else if (class(x)=="IBM2") {
+    object.size.IBM2(x)
+  } else if (class(x)=="IBM3") {
+    object.size.IBM3(x)
+  } else {
+    utils::object.size(x)
+  }
+}
+
 object.size.IBM1 = function(object) {
   totsize = 0
   for (a in ls(envir=object$tmatrix)) {
@@ -11,7 +23,7 @@ object.size.IBM1 = function(object) {
   return(list("tmatrix"=totsize))
 }
 
-#' @export
+
 object.size.IBM2 = function(object) {
   totsize = 0
   for (a in ls(envir=object$tmatrix)) {
@@ -27,7 +39,6 @@ object.size.IBM2 = function(object) {
     )
 }
 
-#' @export
 object.size.IBM3 = function(object) {
   totsize = 0
   for (a in ls(envir=object$tmatrix)) {

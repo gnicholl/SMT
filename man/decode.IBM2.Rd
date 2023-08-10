@@ -2,32 +2,61 @@
 % Please edit documentation in R/decode_IBM2.R
 \name{decode.IBM2}
 \alias{decode.IBM2}
-\title{(IBM2) Compute translation probabilities given a foreign sentence.}
+\title{(IBM2) Stack decoder.}
 \usage{
-\method{decode}{IBM2}(object, fsentence, max_swap = 2, numiter = 4, verbose = TRUE)
+\method{decode}{IBM2}(
+  object,
+  target.sentence,
+  max.length = NULL,
+  threshold = c(1e-05, 1e-10),
+  max.nsen = 1000,
+  senlength.model = NULL,
+  language.model = NULL,
+  IBM1 = FALSE
+)
 }
 \arguments{
 \item{object}{result from IBM2()}
 
-\item{fsentence}{sentence in f language you'd like to translate to e language (vector or space-delimited string)}
+\item{target.sentence}{sentence in f language we'd like to decode (character string)}
 
-\item{max_swap}{maximum distance away two words can be to consider swapping them during decoding (default 2).}
+\item{max.length}{the maximum length of sentence in e language to consider. If left NULL (default), it searches the training corpus for the greatest e sentence length associated with the length of the given f sentence.}
 
-\item{numiter}{number of times heuristics should be tried (default=4). Usually only a couple iterations are needed to find local optimum.}
+\item{threshold}{Vector of two threshold probabilities. First threshold is a cut off for which subset of e words to consider in our algorithm. The second is a cut-off for whether a hypothesis translation will be added to the stack. Smaller values mean greater chance of finding the right translation, but more computational time.}
 
-\item{verbose}{If TRUE (default), then print results of each heuristic step to the screen.}
+\item{max.nsen}{For each iteration, this is the max number of sentences which are allowed to be added to the stack. Larger values mean greater chance of finding the right translation, but more computational time.}
+
+\item{senlength.model}{Matrix such that \code{senlength.model[m,n]} is the probability that e sentence is length m given f sentence is length n. If not provided, it is estimated form the training corpus using a simple poisson regression: \code{glm(e_lengths ~ f_lengths, family="poisson")}.}
+
+\item{language.model}{The result of a \code{kgrams::language_model} estimation. If not provided, we estimate a degree-3 kgrams model from the training corpus using the default "ml" (maximum likelihood) approach. See \code{kgrams} package for more details.}
+
+\item{IBM1}{Default is FALSE. If TRUE, ignores the alignment probabilities of the IBM2 estimation, treating it like an IBM1 model.}
 }
 \value{
-The best translation in e language found after numiter rounds of heuristics.
+The best translation in e language found using the stack decoder.
 }
 \description{
-Takes a sentence in a foreign language f and produces the best translation
-it can find based on IBM2 model. It starts with a word-by-word translation
-into e language. Then it iterates between 4 heuristics: dropping a word,
-reordering words, trying alternate translations of words, or adding
-alternate translations of words. These heuristics are necessary to make
-decoding computationally reasonable, but may result in a local optimum
-rather than a global optimum.
+Implements the IBM2 decoder Algorithm 1 provided in \verb{Wang and Waibel (1998)}.
+Relies on three models: IBM2 translation model, a sentence length model,
+and a kgrams language model. If the latter two aren't provided, they are estimated
+using a similar approach to \verb{Wang and Waibel (1998)}: sentence length is estimated
+using a poisson regression, and the language model is estimated using 3rd-order kgrams.
+Heuristics (\code{max.length},\code{threshold},\code{max.nsen}) are used to reduce computational time,
+at the expense of an increased likelihood of not finding the optimal translation.
+}
+\details{
+Decoding is based on bayes rule: P(e|f) ~ P(f|e) P(e). (Here ~ means "proportional to").
+So in order to translate from f to e, we actually estimate IBM2 from e to f to obtain P(f|e).
+P(e) is the language model and estimated using the \code{kgrams} package. The \code{kgrams}
+documentation provides more details on the different estimation methods available.
+
+Actually, the above equation implicitly conditioned on the length of sentence e.
+Let m be the length of sentence e and n be the length of sentence f.
+Then we really have P(e|f,m,n) ~  P(f|e,m,n) P(e|m,n).
+When we decode, we do not know m beforehand. Thus we really need to model P(e,m|f,n).
+To do this, we assume P(e,m|f,n) = P(e|f,m,n) P(m|n) where P(m|n) is called
+the sentence length model. The factor of P(m|n) ensures that our decoder
+selects a translation of reasonable length.
 }
 \examples{
 # download english-french sentence pairs
@@ -37,13 +66,20 @@ ENFR = readr::read_tsv(file=unz(temp,"fra.txt"),col_names=c("en","fr","details")
 unlink(temp);
 
 # a bit of pre-processing
-e = tolower(stringr::str_squish(tm::removePunctuation(ENFR$en[1:200])));
-f = tolower(stringr::str_squish(tm::removePunctuation(ENFR$fr[1:200])));
+e = removePunctuation(ENFR$en[40001:44000])
+  e = str_squish(e)
+  e = tolower(e)
+f = removePunctuation(ENFR$fr[40001:44000])
+  f = str_squish(f)
+  f = tolower(f)
 
 # estimate model
-out = IBM2(e,f,maxiter=50,eps=0.01,init.IBM1=5);
+model = IBM2(target=f,source=e, maxiter=30, init.IBM1=30)
+  # notice e is source and f is target, even though ultimately
+  # we want to translate from f to e.
 
 # possible english translations and their probabilities
-besttranslation = decode(out, fsentence="une bière sil vous plaît")
+best_translation = decode(model, target.sentence="il est un peu rouillé")
+  # returns "hes a little rusty", as expected
 
 }
