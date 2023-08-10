@@ -5,8 +5,8 @@
 \title{IBM3 Model}
 \usage{
 IBM3(
-  e,
-  f,
+  target,
+  source,
   maxiter = 30,
   eps = 0.01,
   heuristic = TRUE,
@@ -23,9 +23,9 @@ IBM3(
 )
 }
 \arguments{
-\item{e}{vector of sentences in language we want to translate to. Function assumes sentences are space-delimited.}
+\item{target}{vector of sentences in language we want to translate to. Function assumes sentences are space-delimited.}
 
-\item{f}{vector of sentences in language we want to translate from. Function assumes sentences are space-delimited.}
+\item{source}{vector of sentences in language we want to translate from. Function assumes sentences are space-delimited.}
 
 \item{maxiter}{max number of EM iterations allowed}
 
@@ -54,9 +54,9 @@ IBM3(
 \item{samplemethod}{If 1 (default) uses the standard hillclimbing algorithm but without pegging. If 2, uses my own heuristic which considers all alignments where translation probabilities between input and output words are >1e-30. This is faster as long as many of the translation probabilities are 0.}
 }
 \value{
-\item{tmatrix}{Matrix of translation probabilities (cols are words from e, rows are words from f). If sparse=TRUE, tmatrix will be a sparseMatrix from the Matrix package, and will generally take up substantially less memory.}
+\item{tmatrix}{Environment object containing translation probabilities for target-source word pairs. E.g. tmatrix$go$va (equivalently, tmatrix[\link{"go"}][\link{"va"}]) gives the probability of target="go" given source="va".}
 \item{dmatrix}{A list of distortion probability matrices. E.g. dmatrix[\link{3}][\link{4}] gives the distortion probability matrix for e sentences of length 3 and f sentences of length 4.}
-\item{fmatrix}{Matrix of fertility probabilities.}
+\item{fmatrix}{Environment object containing vectors of fertility probabilities for each source word. E.g. fmatrix[\link{"va"}][1] is probability that "va" is aligned with 0 words. fmatrix[\link{"va"}]\link{3} is probability "va" is aligned with 2 words. Each vector is length \code{maxfert+1}.}
 \item{p_null}{Probability of NULL token insertion.}
 \item{numiter}{Number of iterations}
 \item{maxiter}{As above}
@@ -83,6 +83,6 @@ e = tolower(stringr::str_squish(tm::removePunctuation(ENFR$en[1:200])));
 f = tolower(stringr::str_squish(tm::removePunctuation(ENFR$fr[1:200])));
 
 # a model
-model = IBM3(e=e,f=f,maxiter=10, init.IBM1=10, init.IBM2=20)
+model = IBM3(e,f,maxiter=10, init.IBM1=10, init.IBM2=20)
 
 }
