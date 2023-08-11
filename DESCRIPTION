@@ -1,6 +1,6 @@
 Package: SMT
 Title: R package for Statistical Machine Translation
-Version: 0.1
+Version: 0.2
 Authors@R: 
     person("Gradon", "Nicholls", , "gradon.nicholls@gmail.com", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-1783-1201"))
