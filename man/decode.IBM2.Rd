@@ -8,8 +8,8 @@
   object,
   target.sentence,
   max.length = NULL,
-  threshold = c(1e-05, 1e-10),
-  max.nsen = 1000,
+  threshold = c(1e-05, 1e-10, 1e-12),
+  max.nsen = 100,
   senlength.model = NULL,
   language.model = NULL,
   IBM1 = FALSE
@@ -33,7 +33,7 @@
 \item{IBM1}{Default is FALSE. If TRUE, ignores the alignment probabilities of the IBM2 estimation, treating it like an IBM1 model.}
 }
 \value{
-The best translation in e language found using the stack decoder.
+List of best translations found using the stack decoder.
 }
 \description{
 Implements the IBM2 decoder Algorithm 1 provided in \verb{Wang and Waibel (1998)}.

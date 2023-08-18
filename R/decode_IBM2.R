@@ -30,7 +30,7 @@
 #' @param senlength.model Matrix such that `senlength.model[m,n]` is the probability that e sentence is length m given f sentence is length n. If not provided, it is estimated form the training corpus using a simple poisson regression: `glm(e_lengths ~ f_lengths, family="poisson")`.
 #' @param language.model The result of a `kgrams::language_model` estimation. If not provided, we estimate a degree-3 kgrams model from the training corpus using the default "ml" (maximum likelihood) approach. See `kgrams` package for more details.
 #' @param IBM1 Default is FALSE. If TRUE, ignores the alignment probabilities of the IBM2 estimation, treating it like an IBM1 model.
-#' @return The best translation in e language found using the stack decoder.
+#' @return List of best translations found using the stack decoder.
 #' @examples
 #' # download english-french sentence pairs
 #' temp = tempfile()
@@ -58,7 +58,7 @@
 #' @import collections
 #' @export
 decode.IBM2 = function(object, target.sentence,
-                       max.length=NULL, threshold=c(1e-5,1e-10,1e-12), max.nsen=1000,
+                       max.length=NULL, threshold=c(1e-5,1e-10,1e-12), max.nsen=100,
                        senlength.model=NULL, language.model=NULL,
                        IBM1=FALSE) {
   # params
@@ -67,7 +67,7 @@ decode.IBM2 = function(object, target.sentence,
   if (is.null(max.length)) {
     max.length = max(object$corpus$source_lengths[object$corpus$target_lengths==ltarget]) - 1
   }
-  if (length(threshold)==1) threshold = rep(threshold,2)
+  if (length(threshold)==1) threshold = rep(threshold,3)
 
   # if no sentence length model, use basic poisson regression
   if (is.null(senlength.model)) {
@@ -194,11 +194,10 @@ decode.IBM2 = function(object, target.sentence,
         if (Hnew$score >= thresh) {
           all_Q[[Hnew$length+1]]$push(Hnew, priority=Hnew$score); nsen = nsen+1
 
-          finalscore = senlength.model[Hnew$length,ltarget]*
+          Hnew$finalscore = senlength.model[Hnew$length + 1,ltarget]*
             tau_l(Hnew$prefix,Hnew$length)*
             kgrams::probability(paste0(c("<NULL>", Hnew$prefix), collapse=" "), model=language.model)
-          Hnew$score = finalscore
-          keepers$push(Hnew,priority=Hnew$score)
+          keepers$push(Hnew,priority=Hnew$finalscore)
         }
         if (nsen>=max.nsen) break
       }
@@ -207,7 +206,7 @@ decode.IBM2 = function(object, target.sentence,
   }
 
   #return(paste0(keepers$pop()$prefix,collapse=" "))
-  return(keepers)
+  return(keepers$as_list())
 
 } # decode.IBM2
 
