@@ -58,7 +58,7 @@
 #' @import collections
 #' @export
 decode.IBM2 = function(object, target.sentence,
-                       max.length=NULL, threshold=c(1e-5,1e-10), max.nsen=1000,
+                       max.length=NULL, threshold=c(1e-5,1e-8,1e-12), max.nsen=1000,
                        senlength.model=NULL, language.model=NULL,
                        IBM1=FALSE) {
   # params
@@ -98,7 +98,7 @@ decode.IBM2 = function(object, target.sentence,
   promising_words = promising_words[promising_words!="<NULL>"]
 
   # get word frequencies
-  e_sentences = lapply(X=e,FUN=function(s) unlist(stringr::str_split(s, " ")))
+  e_sentences = lapply(X=object$corpus$source,FUN=function(s) unlist(stringr::str_split(s, " ")))
   e_sentences = unique(unlist(e_sentences))
   wfrq = table(e_sentences)
   wfrq = wfrq[promising_words]
@@ -151,7 +151,7 @@ decode.IBM2 = function(object, target.sentence,
       sum(
         sapply(
           X=length(prefix):max.length,
-          FUN=function(lsource) senlength.model[lsource,ltarget]*tau_l(prefix,lsource)
+          FUN=function(lsource) senlength.model[lsource+1,ltarget]*tau_l(prefix,lsource)
         )
       )
     )
@@ -181,7 +181,9 @@ decode.IBM2 = function(object, target.sentence,
   all_Q[[1]]$push(H0, priority=threshold[2])
 
   # build up the stacks
+  thresh = threshold[2]
   for (k in 1:(max.length+1)) {
+    if (k == 3) thresh = threshold[3]
     nsen = 0
     while( (all_Q[[k]]$size() > 0)  &  (nsen<max.nsen)  ) {
       H = all_Q[[k]]$pop()
@@ -189,7 +191,7 @@ decode.IBM2 = function(object, target.sentence,
         Hnew = list("length"=H$length+1,
                     "prefix"=c(H$prefix,w),
                     "score"=scoreIBM2( c(H$prefix,w) ) )
-        if (Hnew$score >= threshold[2]) {
+        if (Hnew$score >= thresh) {
           all_Q[[Hnew$length+1]]$push(Hnew, priority=Hnew$score); nsen = nsen+1
 
           finalscore = senlength.model[Hnew$length,ltarget]*
@@ -198,12 +200,14 @@ decode.IBM2 = function(object, target.sentence,
           Hnew$score = finalscore
           keepers$push(Hnew,priority=Hnew$score)
         }
+        if (nsen>=max.nsen) break
       }
 
     }
   }
 
-  return(paste0(keepers$pop()$prefix,collapse=" "))
+  #return(paste0(keepers$pop()$prefix,collapse=" "))
+  return(keepers)
 
 } # decode.IBM2
 
