@@ -58,14 +58,14 @@
 #' @import collections
 #' @export
 decode.IBM2 = function(object, target.sentence,
-                       max.length=NULL, threshold=c(1e-5,1e-8,1e-12), max.nsen=1000,
+                       max.length=NULL, threshold=c(1e-5,1e-10,1e-12), max.nsen=1000,
                        senlength.model=NULL, language.model=NULL,
                        IBM1=FALSE) {
   # params
   target.sentence = unlist(stringr::str_split(target.sentence," "))
   ltarget = length(target.sentence)
   if (is.null(max.length)) {
-    max.length = max(object$corpus$source_lengths[object$corpus$target_lengths==ltarget])
+    max.length = max(object$corpus$source_lengths[object$corpus$target_lengths==ltarget]) - 1
   }
   if (length(threshold)==1) threshold = rep(threshold,2)
 
