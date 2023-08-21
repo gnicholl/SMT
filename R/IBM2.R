@@ -10,7 +10,7 @@
 #' @param add.null.token If TRUE (default), adds <NULL> to beginning of each source sentence. Allows target words to be aligned with "nothing".
 #' @param init.tmatrix tmatrix from a previous estimation to be fed to IBM1 algorithm. If not provided, algorithm starts with uniform probabilities.
 #' @param init.amatrix amatrix from a previous estimation. If not provided, algorithm starts with uniform probabilities.
-#' @param verbose If 1, shows progress bar for each iteration, and a summary when each iteration is complete. If 0.5 (default), only shows the summary without progress bars. If 0, shows nothing.
+#' @param verbose If >=1, shows progress bar which updates every `verbose` steps, plus a summary when each iteration is complete. If 0.5 (default), only shows the summary without progress bars. If 0, shows nothing.
 #' @return
 #'    \item{tmatrix}{Environment object containing translation probabilities for target-source word pairs. E.g. tmatrix$go$va (equivalently, tmatrix[["go"]][["va"]]) gives the probability of target="go" given source="va".}
 #'    \item{amatrix}{A list of alignment probability matrices. E.g. amatrix[[3]][[4]] gives the alignment probability matrix for target sentences of length 3 and source sentences of length 4.}
@@ -20,6 +20,7 @@
 #'    \item{converged}{TRUE if algorithm stopped once eps criteria met. FALSE otherwise.}
 #'    \item{perplexity}{Final likelihood/perplexity value.}
 #'    \item{time_elapsed}{Time in minutes the algorithm ran for.}
+#'    \item{corpus}{data frame containing the target and source sentences and their lengths}
 #' @examples
 #' # download english-french sentence pairs
 #' temp = tempfile()
@@ -90,16 +91,16 @@ IBM2 = function(target,source,maxiter=30,eps=0.01,init.IBM1=10,add.null.token=TR
   combos = unique(s_lengths)
   if (is.null(init.amatrix)) {
     aprob = list()
-    for (k in unique(combos$target_lengths)) {
-      aprob[[k]] = list()
+    for (i in unique(combos$target_lengths)) {
+      aprob[[i]] = list()
     }
   } else {
     aprob = init.amatrix
   }
   acount = aprob
-  for (k in 1:nrow(combos)) {
-    le = combos$target_lengths[k]
-    lf = combos$source_lengths[k]
+  for (i in 1:nrow(combos)) {
+    le = combos$target_lengths[i]
+    lf = combos$source_lengths[i]
     if (is.null(init.amatrix)) aprob[[le]][[lf]] = matrix(1/lf,nrow=le,ncol=lf)
     acount[[le]][[lf]] = matrix(0,nrow=le,ncol=lf)
   }
@@ -115,9 +116,10 @@ IBM2 = function(target,source,maxiter=30,eps=0.01,init.IBM1=10,add.null.token=TR
   while (iter<=maxiter & abs(total_perplex - prev_perplex)>eps) {
 
     # E step
-    if (verbose==1) pb = progress_bar$new(total=n,clear=TRUE,
-                      format=paste0("iter: ",iter," (E-step) [:bar] :current/:total (eta: :eta)")  )
-    if (verbose==1) pb$tick(0)
+    if (verbose>=1) {
+      pb = progress_bar$new(total=n,clear=TRUE,format=paste0("iter: ",iter," (E-step) [:bar] :current/:total (eta: :eta)")  )
+      pb$tick(0)
+    }
     for (s in 1:n) {
 
       e_sen = e_sentences[[s]]; le = length(e_sen)
@@ -145,39 +147,46 @@ IBM2 = function(target,source,maxiter=30,eps=0.01,init.IBM1=10,add.null.token=TR
         }
       }
 
-      if(verbose==1) if( i==round(k*n/10) ) pb$tick(round(n/10)); k = k+1
+      if(verbose>=1 & s%%verbose==0) pb$tick(verbose)
     } # end for i in 1:n
-    if (verbose==1) pb$terminate()
+    if (verbose>=1) pb$terminate()
 
     # M Step, and reset counts to 0
-    if (verbose==1) pb = progress_bar$new(total=n_eword+n_fword,clear=TRUE,
-                      format=paste0("iter: ",iter," (M-step) [:bar] :current/:total (eta: :eta)")  )
-    if (verbose==1) pb$tick(0)
+    if (verbose>=1) {
+      pb = progress_bar$new(total=n_eword+n_fword+nrow(combos),clear=TRUE,format=paste0("iter: ",iter," (M-step) [:bar] :current/:total (eta: :eta)")  )
+      pb$tick(0); k = 1
+    }
     for (eword in e_allwords) {
       for (fword in ls(t_e_f[[eword]])) {
         t_e_f[[eword]][[fword]] = c_e_f[[eword]][[fword]] / total_f[[fword]]
         c_e_f[[eword]][[fword]] = 0
       }
-      if(verbose==1) if( i==round(k*(n_eword+n_fword)/10) ) pb$tick(round((n_eword+n_fword)/10)); k = k+1
+
+      if(verbose>=1){if(k%%verbose==0) pb$tick(verbose)}
+      if(verbose>=1) k = k+1
     }
     for (fword in f_allwords) {
       total_f[[fword]] = 0
-      if(verbose==1) if( i==round(k*(n_eword+n_fword)/10) ) pb$tick(round((n_eword+n_fword)/10)); k = k+1
-    }
-    if (verbose==1) pb$terminate()
 
-    # update a probs, reset counts
-    for (k in 1:nrow(combos)) {
-      le = combos$target_lengths[k]
-      lf = combos$source_lengths[k]
+      if(verbose>=1){if(k%%verbose==0) pb$tick(verbose)}
+      if(verbose>=1) k = k+1
+    }
+    for (i in 1:nrow(combos)) {
+      le = combos$target_lengths[i]
+      lf = combos$source_lengths[i]
       aprob[[le]][[lf]][] = acount[[le]][[lf]] / Rfast::rowsums(acount[[le]][[lf]])
       acount[[le]][[lf]][] = 0
+
+      if(verbose>=1){if(k%%verbose==0) pb$tick(verbose)}
+      if(verbose>=1) k = k+1
     }
+    if (verbose>=1) pb$terminate()
 
     # compute perplexity
-    if (verbose==1) pb = progress_bar$new(total=n,clear=TRUE,
-                      format=paste0("iter: ",iter," (perplexity) [:bar] :current/:total (eta: :eta)")  )
-    if (verbose==1) pb$tick(0)
+    if (verbose>=1) {
+      pb = progress_bar$new(total=n,clear=TRUE,format=paste0("iter: ",iter," (perplexity) [:bar] :current/:total (eta: :eta)")  )
+      pb$tick(0)
+    }
     prev_perplex = total_perplex
     total_perplex = 0
     for (s in 1:n) {
@@ -194,9 +203,9 @@ IBM2 = function(target,source,maxiter=30,eps=0.01,init.IBM1=10,add.null.token=TR
         total_perplex = total_perplex - log(tmp)
       }
 
-      if(verbose==1) if( i==round(k*n/10) ) pb$tick(round(n/10)); k = k+1
+      if(verbose>=1 & s%%verbose==0) pb$tick(verbose)
     }
-
+    if (verbose>=1) pb$terminate()
 
     time_elapsed = round(difftime(Sys.time(),start_time,units='min'),3)
     if(verbose>=0.5) print(paste0("iter: ",iter,"; perplexity value: ",total_perplex, "; time elapsed: ",time_elapsed,"min"))

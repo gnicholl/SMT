@@ -19,7 +19,7 @@
 #' @param init.fmatrix fmatrix from a previous estimation. Used to initialize IBM3. If not provided, algorithm starts with uniform probabilities.
 #' @param init.dmatrix dmatrix from a previous estimation. Used to initialize IBM3. If not provided, algorithm starts with uniform probabilities.
 #' @param init.p_null  p_null  from a previous estimation. Used to initialize IBM3. If not provided, algorithm starts with `p_null=0.5`.
-#' @param verbose If 1, shows progress bar for each iteration, and a summary when each iteration is complete. If 0.5 (default), only shows the summary without progress bars. If 0, shows nothing.
+#' @param verbose If >=1, shows progress bar which updates every `verbose` steps, plus a summary when each iteration is complete. If 0.5 (default), only shows the summary without progress bars. If 0, shows nothing.
 #' @param samplemethod If 1 (default) uses the standard hillclimbing algorithm but without pegging. If 2, uses my own heuristic which considers all alignments where translation probabilities between input and output words are >1e-30. This is faster as long as many of the translation probabilities are 0.
 #' @return
 #'    \item{tmatrix}{Environment object containing translation probabilities for target-source word pairs. E.g. tmatrix$go$va (equivalently, tmatrix[["go"]][["va"]]) gives the probability of target="go" given source="va".}
@@ -32,6 +32,7 @@
 #'    \item{converged}{TRUE if algorithm stopped once eps criteria met. FALSE otherwise.}
 #'    \item{perplexity}{Final likelihood/perplexity value.}
 #'    \item{time_elapsed}{Time in minutes the algorithm ran for.}
+#'    \item{corpus}{data frame containing the target and source sentences and their lengths}
 #' @examples
 #' # download english-french sentence pairs
 #' temp = tempfile()
@@ -228,16 +229,16 @@ IBM3 = function(target, source, maxiter=30, eps=0.01, heuristic=TRUE, maxfert=5,
   combos = unique(s_lengths)
   if (is.null(init.dmatrix)) {
     dprob = list()
-    for (k in unique(combos$e_lengths)) {
-      dprob[[k]] = list()
+    for (i in unique(combos$e_lengths)) {
+      dprob[[i]] = list()
     }
   } else {
     dprob = init.dmatrix
   }
   dcount = dprob
-  for (k in 1:nrow(combos)) {
-    le = combos$e_lengths[k]
-    lf = combos$f_lengths[k]
+  for (i in 1:nrow(combos)) {
+    le = combos$e_lengths[i]
+    lf = combos$f_lengths[i]
     if (is.null(init.dmatrix)) dprob[[le]][[lf]] = matrix(1/le,nrow=le,ncol=lf)
     dcount[[le]][[lf]] = matrix(0,nrow=le,ncol=lf)
   }
@@ -273,8 +274,10 @@ IBM3 = function(target, source, maxiter=30, eps=0.01, heuristic=TRUE, maxfert=5,
   while (iter<=maxiter & abs(total_perplex - prev_perplex)>eps) { # until convergence
 
     ### E STEP #################################################################
-    if(verbose==1) pb = progress::progress_bar$new(total=n,clear=TRUE,
-                                                   format=paste0("iteration ",iter," (:what) [:bar] :current/:total (eta: :eta)")  )
+    if (verbose>=1) {
+      pb = progress_bar$new(total=n,clear=TRUE,format=paste0("iter: ",iter," (E-step) [:bar] :current/:total (eta: :eta)")  )
+      pb$tick(0)
+    }
     for (s in 1:n) { # for all sentence pairs
       # extract kth sentence pair
       e_sen = e_sentences[[s]]; le = length(e_sen)
@@ -329,14 +332,18 @@ IBM3 = function(target, source, maxiter=30, eps=0.01, heuristic=TRUE, maxfert=5,
         } # if ctotal[r]>0
       } # for a in A
 
-      if(verbose==1) pb$tick()
+      if(verbose>=1 & s%%verbose==0) pb$tick(verbose)
 
     } # for k (all sentences)
-    if(verbose==1) pb$terminate()
+    if(verbose>=1) pb$terminate()
     ############################################################################
 
 
     ### M STEP #################################################################
+    if (verbose>=1) {
+      pb = progress_bar$new(total=n_eword+nrow(combos)+n_fword+1,clear=TRUE,format=paste0("iter: ",iter," (M-step) [:bar] :current/:total (eta: :eta)")  )
+      pb$tick(0); k = 1
+    }
     # translation probs
     for (eword in e_allwords) {
       for (fword in ls(t_e_f[[eword]])) {
@@ -347,22 +354,25 @@ IBM3 = function(target, source, maxiter=30, eps=0.01, heuristic=TRUE, maxfert=5,
         }
         c_e_f[[eword]][[fword]] = 0
       }
-    }
-    for (fword in f_allwords) {
-      total_f[[fword]] = 0
+
+      if(verbose>=1){if(k%%verbose==0) pb$tick(verbose)}
+      if(verbose>=1) k = k+1
     }
 
     # distortion probs
-    for (k in 1:nrow(combos)) {
-      le = combos$e_lengths[k]
-      lf = combos$f_lengths[k]
+    for (i in 1:nrow(combos)) {
+      le = combos$e_lengths[i]
+      lf = combos$f_lengths[i]
       if (le==1) {
         dprob[[le]][[lf]][] = 1
       } else {
-        tmp = colSums(dcount[[le]][[lf]])
+        tmp = Rfast::colsums(dcount[[le]][[lf]])
         if (sum(tmp>0)>1)  dprob[[le]][[lf]][,tmp>0] = dcount[[le]][[lf]][,tmp>0] %*% diag(1/tmp[tmp>0])
         if (sum(tmp>0)==1) dprob[[le]][[lf]][,tmp>0] = dcount[[le]][[lf]][,tmp>0] * (1/tmp[tmp>0])
       }
+
+      if(verbose>=1){if(k%%verbose==0) pb$tick(verbose)}
+      if(verbose>=1) k = k+1
     }
 
     # fertility probs
@@ -372,13 +382,18 @@ IBM3 = function(target, source, maxiter=30, eps=0.01, heuristic=TRUE, maxfert=5,
       } else {
         fertmatrix[[fword]] = fertcount[[fword]] / sum(fertcount[[fword]])
       }
+      total_f[[fword]] = 0
       fertcount[[fword]][]  = 0
+
+      if(verbose>=1){if(k%%verbose==0) pb$tick(verbose)}
+      if(verbose>=1) k = k+1
     }
 
     # NULL token probs
     p_null = p1count / (p1count + p0count)
     p1count = 0
     p0count = 0
+    if (verbose>=1) pb$terminate()
     ############################################################################
 
 
@@ -403,7 +418,8 @@ IBM3 = function(target, source, maxiter=30, eps=0.01, heuristic=TRUE, maxfert=5,
     "eps"=eps,
     "converged"=abs(total_perplex - prev_perplex)<=eps,
     "perplexity"=total_perplex,
-    "time_elapsed"=time_elapsed
+    "time_elapsed"=time_elapsed,
+    "corpus"=out_IBM2$corpus
   )
   class(retobj) = "IBM3"
   return(retobj)

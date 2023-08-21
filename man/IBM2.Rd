@@ -33,7 +33,7 @@ IBM2(
 
 \item{init.amatrix}{amatrix from a previous estimation. If not provided, algorithm starts with uniform probabilities.}
 
-\item{verbose}{If 1, shows progress bar for each iteration, and a summary when each iteration is complete. If 0.5 (default), only shows the summary without progress bars. If 0, shows nothing.}
+\item{verbose}{If >=1, shows progress bar which updates every \code{verbose} steps, plus a summary when each iteration is complete. If 0.5 (default), only shows the summary without progress bars. If 0, shows nothing.}
 }
 \value{
 \item{tmatrix}{Environment object containing translation probabilities for target-source word pairs. E.g. tmatrix$go$va (equivalently, tmatrix[\link{"go"}][\link{"va"}]) gives the probability of target="go" given source="va".}
@@ -44,6 +44,7 @@ IBM2(
 \item{converged}{TRUE if algorithm stopped once eps criteria met. FALSE otherwise.}
 \item{perplexity}{Final likelihood/perplexity value.}
 \item{time_elapsed}{Time in minutes the algorithm ran for.}
+\item{corpus}{data frame containing the target and source sentences and their lengths}
 }
 \description{
 The second SMT model from Brown et al. (1993)

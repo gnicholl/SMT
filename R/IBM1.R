@@ -9,7 +9,7 @@
 #' @param eps convergence criteria for perplexity (i.e. negative log-likelihood)
 #' @param add.null.token If TRUE (default), adds <NULL> to beginning of each source sentence. Allows target words to be aligned with "nothing".
 #' @param init.tmatrix tmatrix from a previous estimation. If not provided, algorithm starts with uniform probabilities.
-#' @param verbose If 1, shows progress bar for each iteration, and a summary when each iteration is complete. If 0.5 (default), only shows the summary without progress bars. If 0, shows nothing.
+#' @param verbose If >=1, shows progress bar which updates every `verbose` steps, plus a summary when each iteration is complete. If 0.5 (default), only shows the summary without progress bars. If 0, shows nothing.
 #' @return
 #'    \item{tmatrix}{Environment object containing translation probabilities for target-source word pairs. E.g. tmatrix$go$va (equivalently, tmatrix[["go"]][["va"]]) gives the probability of target="go" given source="va".}
 #'    \item{numiter}{Number of iterations}
@@ -38,7 +38,7 @@
 IBM1 = function(target,source,maxiter=30,eps=0.01,add.null.token=TRUE,init.tmatrix=NULL,verbose=0.5) {
 
   # error checking
-  stopifnot(maxiter>=0,eps>0,add.null.token %in% c(TRUE,FALSE), verbose %in% c(0,0.5,1),
+  stopifnot(maxiter>=0,eps>0,add.null.token %in% c(TRUE,FALSE), (verbose %in% c(0,0.5)) | (verbose>=1),
     is.null(init.tmatrix) | is.environment(init.tmatrix))
 
 
@@ -94,10 +94,10 @@ IBM1 = function(target,source,maxiter=30,eps=0.01,add.null.token=TRUE,init.tmatr
   while (iter<=maxiter & abs(total_perplex - prev_perplex)>eps) {
 
     # E Step
-    if (verbose==1) pb = progress_bar$new(total=n,clear=TRUE,
-                      format=paste0("iter: ",iter," (E-step) [:bar] :current/:total (eta: :eta)")  )
-    if (verbose==1) pb$tick(0)
-    k = 1
+    if (verbose>=1) {
+      pb = progress_bar$new(total=n,clear=TRUE,format=paste0("iter: ",iter," (E-step) [:bar] :current/:total (eta: :eta)")  )
+      pb$tick(0)
+    }
     for (s in 1:n) {
 
       # normalization
@@ -116,35 +116,39 @@ IBM1 = function(target,source,maxiter=30,eps=0.01,add.null.token=TRUE,init.tmatr
         }
       }
 
-      if(verbose==1) if( i==round(k*n/10) ) pb$tick(round(n/10)); k = k+1
+      # progress
+      if(verbose>=1 & s%%verbose==0) pb$tick(verbose)
 
     } # end for s in 1:n
-    if (verbose==1) pb$terminate()
+    if (verbose>=1) pb$terminate()
 
     # M Step, and reset counts to 0
-    if (verbose==1) pb = progress_bar$new(total=n_eword+n_fword,clear=TRUE,
-                      format=paste0("iter: ",iter," (M-step) [:bar] :current/:total (eta: :eta)")  )
-    if (verbose==1) pb$tick(0)
-    k = 1
+    if (verbose>=1) {
+      pb = progress_bar$new(total=n_eword+n_fword,clear=TRUE,format=paste0("iter: ",iter," (M-step) [:bar] :current/:total (eta: :eta)")  )
+      pb$tick(0); k = 1
+    }
     for (eword in e_allwords) {
       for (fword in ls(t_e_f[[eword]])) {
         t_e_f[[eword]][[fword]] = c_e_f[[eword]][[fword]] / total_f[[fword]]
         c_e_f[[eword]][[fword]] = 0
       }
 
-      if(verbose==1) if( i==round(k*(n_eword+n_fword)/10) ) pb$tick(round((n_eword+n_fword)/10)); k = k+1
+      if(verbose>=1){if(k%%verbose==0) pb$tick(verbose)}
+      if(verbose>=1) k = k+1
     }
     for (fword in f_allwords) {
       total_f[[fword]] = 0
 
-      if(verbose==1) if( i==round(k*(n_eword+n_fword)/10) ) pb$tick(round((n_eword+n_fword)/10)); k = k+1
+      if(verbose>=1){if(k%%verbose==0) pb$tick(verbose)}
+      if(verbose>=1) k = k+1
     }
-    if (verbose==1) pb$terminate()
+    if (verbose>=1) pb$terminate()
 
     # compute perplexity
-    if (verbose==1) pb = progress_bar$new(total=n,clear=TRUE,
-                      format=paste0("iter: ",iter," (perplexity) [:bar] :current/:total (eta: :eta)")  )
-    if (verbose==1) pb$tick(0)
+    if (verbose>=1) {
+      pb = progress_bar$new(total=n,clear=TRUE,format=paste0("iter: ",iter," (perplexity) [:bar] :current/:total (eta: :eta)")  )
+      pb$tick(0)
+    }
     prev_perplex = total_perplex
     total_perplex = perp_const
     for (s in 1:n) {
@@ -156,9 +160,9 @@ IBM1 = function(target,source,maxiter=30,eps=0.01,add.null.token=TRUE,init.tmatr
         total_perplex = total_perplex - log(tmp)
       }
 
-      if(verbose==1) if( i==round(k*n/10) ) pb$tick(round(n/10)); k = k+1
+      if(verbose>=1 & s%%verbose==0) pb$tick(verbose)
     }
-    if (verbose==1) pb$terminate()
+    if (verbose>=1) pb$terminate()
 
     time_elapsed = round(difftime(Sys.time(),start_time,units='min'),3)
     if(verbose>=0.5) print(paste0("iter: ",iter,"; perplexity value: ",total_perplex, "; time elapsed: ",time_elapsed,"min"))

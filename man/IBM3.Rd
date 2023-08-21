@@ -49,7 +49,7 @@ IBM3(
 
 \item{init.p_null}{p_null  from a previous estimation. Used to initialize IBM3. If not provided, algorithm starts with \code{p_null=0.5}.}
 
-\item{verbose}{If 1, shows progress bar for each iteration, and a summary when each iteration is complete. If 0.5 (default), only shows the summary without progress bars. If 0, shows nothing.}
+\item{verbose}{If >=1, shows progress bar which updates every \code{verbose} steps, plus a summary when each iteration is complete. If 0.5 (default), only shows the summary without progress bars. If 0, shows nothing.}
 
 \item{samplemethod}{If 1 (default) uses the standard hillclimbing algorithm but without pegging. If 2, uses my own heuristic which considers all alignments where translation probabilities between input and output words are >1e-30. This is faster as long as many of the translation probabilities are 0.}
 }
@@ -64,6 +64,7 @@ IBM3(
 \item{converged}{TRUE if algorithm stopped once eps criteria met. FALSE otherwise.}
 \item{perplexity}{Final likelihood/perplexity value.}
 \item{time_elapsed}{Time in minutes the algorithm ran for.}
+\item{corpus}{data frame containing the target and source sentences and their lengths}
 }
 \description{
 The third SMT model from Brown et al. (1993). Note that, unlike IBM1 and IBM2 functions,
