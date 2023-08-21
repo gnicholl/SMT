@@ -181,10 +181,17 @@ IBM3 = function(target, source, maxiter=30, eps=0.01, heuristic=TRUE, maxfert=5,
     mylist = vector(mode = "list", length = length(e_sen))
     for (j in 1:length(e_sen)) {
       for (i in 1:length(f_sen)) {
-        if ( ( t_e_f[[ e_sen[j] ]][[ f_sen[i] ]] > 1e-30 ) ) mylist[[j]] = c(mylist[[j]],i)
+        if ( ( t_e_f[[ e_sen[j] ]][[ f_sen[i] ]] > 1e-10 ) & ( dprob[[le]][[lf]][j,i] > 1e-10 ) ) {
+           mylist[[j]] = c(mylist[[j]],i)
+        }
       }
       if ( length(mylist[[j]])==0 ) mylist[[j]] = c(1)
     }
+    #A = as.matrix(expand.grid(mylist))
+    #for (i in 2:lf) {
+    #  A = A[fertmatrix[[f_sen[i]]][pmin(Rfast::rowsums(A==i),maxfert)+1]>1e-10,]
+    #}
+    #return(A)
     return(as.matrix(expand.grid(mylist)))
   }
   ##############################################################################
@@ -250,10 +257,11 @@ IBM3 = function(target, source, maxiter=30, eps=0.01, heuristic=TRUE, maxfert=5,
   p0count = 0
 
   # init fertility matrix
-  if (is.null(init.fmatrix)) {
-    fertmatrix = new.env()
-  } else {
-    fertmatrix = init.fmatrix
+  fertmatrix = new.env()
+  if (!is.null(init.fmatrix)) {
+    for (a in ls(init.fmatrix)) {
+      fertmatrix[[a]] = init.fmatrix[[a]]
+    }
   }
   fertcount  = new.env()
   for ( fword in f_allwords ) {

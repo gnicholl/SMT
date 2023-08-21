@@ -62,8 +62,15 @@ IBM1 = function(target,source,maxiter=30,eps=0.01,add.null.token=TRUE,init.tmatr
   perp_const = sum(target_lengths*log(source_lengths))
 
   # initialize matrices
-  if (is.null(init.tmatrix))  t_e_f = new.env()
-  if (!is.null(init.tmatrix)) t_e_f = init.tmatrix
+  t_e_f = new.env()
+  if (!is.null(init.tmatrix)) {
+    for (a in ls(init.tmatrix)) {
+      t_e_f[[a]] = new.env()
+      for (b in ls(init.tmatrix[[a]])) {
+        t_e_f[[a]][[b]] = init.tmatrix[[a]][[b]]
+      }
+    }
+  }
   c_e_f = new.env()
   s_total = new.env()
   total_f = new.env()
