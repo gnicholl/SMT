@@ -20,7 +20,9 @@ Imports:
     progress (>= 1.2.2),
     udpipe (>= 0.8.11),
     parallel (>= 4.3.0),
-    ngram (>= 3.2.2)
+    ngram (>= 3.2.2),
+    collections (>= 0.3.7),
+    kgrams (>= 0.1.5)
 Suggests: 
     knitr,
     rmarkdown
