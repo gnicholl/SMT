@@ -16,7 +16,6 @@ Imports:
     fastmatch (>= 1.1),
     gtools (>= 3.9.4),
     Rfast (>= 2.0.7),
-    index0 (>= 0.0.1),
     progress (>= 1.2.2),
     udpipe (>= 0.8.11),
     parallel (>= 4.3.0),

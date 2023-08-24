@@ -33,6 +33,7 @@
 #'    \item{perplexity}{Final likelihood/perplexity value.}
 #'    \item{time_elapsed}{Time in minutes the algorithm ran for.}
 #'    \item{corpus}{data frame containing the target and source sentences and their lengths}
+#'    \item{prev_best_aligns}{list containing best alignments (i.e. "viterbi" alignments) for each target sentence}
 #' @examples
 #' # download english-french sentence pairs
 #' temp = tempfile()
@@ -41,11 +42,11 @@
 #' unlink(temp);
 #'
 #' # a bit of pre-processing
-#' e = tolower(stringr::str_squish(tm::removePunctuation(ENFR$en[1:200])));
-#' f = tolower(stringr::str_squish(tm::removePunctuation(ENFR$fr[1:200])));
+#' e = tolower(stringr::str_squish(tm::removePunctuation(ENFR$en[1:10000])));
+#' f = tolower(stringr::str_squish(tm::removePunctuation(ENFR$fr[1:10000])));
 #'
 #' # a model
-#' model = IBM3(e,f,maxiter=10, init.IBM1=10, init.IBM2=20)
+#' model = IBM3(target=e,source=f,maxiter=10, init.IBM1=10, init.IBM2=20)
 #'
 #' @import progress
 #' @export
@@ -60,7 +61,10 @@ IBM3 = function(target, source, maxiter=30, eps=0.01, heuristic=TRUE, maxfert=5,
 
   # initialize with IBM1 and IBM2
   start_time = Sys.time()
-  out_IBM2 = IBM2(target=target,source=source,eps=eps,maxiter=init.IBM2,init.IBM1=init.IBM1,add.null.token=TRUE,init.tmatrix=init.tmatrix,init.amatrix=init.amatrix,verbose=verbose)
+  out_IBM2 = IBM2(target=target,source=source,eps=eps,maxiter=init.IBM2,
+                  init.IBM1=init.IBM1,add.null.token=TRUE,
+                  init.tmatrix=init.tmatrix,init.amatrix=init.amatrix,
+                  verbose=verbose)
   if(verbose>=0.5) print(paste0("------running ",maxiter," iterations of IBM3-------"))
 
   # add NULL token
@@ -169,11 +173,11 @@ IBM3 = function(target, source, maxiter=30, eps=0.01, heuristic=TRUE, maxfert=5,
     if (length(prev_best_aligns) < s) {
       a_0 = viterbi_IBM2(e_sen,f_sen)
       a_n = hillclimb(a_0,e_sen,f_sen)
-      prev_best_aligns[[s]] = a_n
+      prev_best_aligns[[s]] <<- a_n
     } else {
       a_0 = prev_best_aligns[[s]]
       a_n = hillclimb(a_0,e_sen,f_sen)
-      prev_best_aligns[[s]] = a_n
+      prev_best_aligns[[s]] <<- a_n
     }
     return(neighbourhood(a_n,length(e_sen),length(f_sen)))
   }
@@ -314,6 +318,7 @@ IBM3 = function(target, source, maxiter=30, eps=0.01, heuristic=TRUE, maxfert=5,
           ctotal[r] = pr_IBM3(A[r,],e_sen,f_sen)
         }
       }
+      prev_best_aligns[[s]] = A[which.max(ctotal),]
       perplex_vec[s] = mean(ctotal)
       if (sum(ctotal)==0) warning(paste0("sentence ",s,": all sampled alignments had probability 0"),immediate. = TRUE)
       if (sum(ctotal)>0) ctotal = ctotal / sum(ctotal)
@@ -427,7 +432,8 @@ IBM3 = function(target, source, maxiter=30, eps=0.01, heuristic=TRUE, maxfert=5,
     "converged"=abs(total_perplex - prev_perplex)<=eps,
     "perplexity"=total_perplex,
     "time_elapsed"=time_elapsed,
-    "corpus"=out_IBM2$corpus
+    "corpus"=out_IBM2$corpus,
+    "prev_best_aligns"=prev_best_aligns
   )
   class(retobj) = "IBM3"
   return(retobj)

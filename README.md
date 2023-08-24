@@ -1,7 +1,6 @@
-# SMT
-Statistical Machine Translation (SMT) in R
+# SMT: Statistical Machine Translation in R
 
-This R package implements the translation models IBM1, IBM2, and IBM3 from `Brown et al (1993)`. While SMT methods have largely been overtaken by neural network-based methods, the IBM models remain historically important and are still used in conjunction with neural methods thanks to their word-alignment capabilities.
+This R package implements the translation models IBM1, IBM2, IBM3, and IBM4 from `Brown et al (1993)`. While SMT methods have largely been overtaken by neural network-based methods, the IBM models remain historically important and are still used in conjunction with neural methods thanks to their word-alignment capabilities.
 
 ## Noisy-Channel Model
 
@@ -19,7 +18,7 @@ $$
 \mathbf{e} = \text{argmax}_{\mathbf{e}} \Pr(\mathbf{e} | \mathbf{f}, m) = \text{argmax} _{\mathbf{e}} \Pr(\mathbf{e} | \mathbf{f}, n, m) \Pr(n | m) = \text{argmax} _{\mathbf{e}} \Pr(\mathbf{f} | \mathbf{e}, n, m) \Pr(\mathbf{e} | n) \Pr(n | m)
 $$
 
-In the decoding algorithm of `Wang & Waibel (1998)`, they state that they model $\Pr(n | m)$ using a simple poisson regression, which is what we do here by default.
+In the decoding algorithm of `Wang & Waibel (1998)`, they state that they model $\Pr(n | m)$ using a poisson regression, which is what we do here by default.
 
 To summarise:
 
@@ -30,7 +29,7 @@ To summarise:
 ## Estimating the IBM Models
 
 Algorithms for IBM1 and IBM2 largely follow those provided in `Koehn (2009)`. 
-For IBM3, I use the heuristic algorithm _without_ pegging as described in the appendix of `Och & Ney (2003)`. 
+For IBM3 and IBM4, I use the heuristic algorithm _without_ pegging as described in the appendix of `Och & Ney (2003)`. 
 Given a vector of output sentences `target` and input sentences `source`, each function
 follows the basic syntax of `IBMX(target,source,maxiter,eps)` where `X` is 1, 2, or 3, `maxiter`
 is the maximum number of iterations allowed, and `eps` is the stopping criteria
@@ -75,7 +74,7 @@ will also affect `tmatrix1`.
 To generate most likely translations for a given sentence in language f to language e, 
 use the generic method `decode(object,target.sentence,senlength.model,language.model)`
 where `object` is an IBM1 or IBM2 object returned from one of the respective functions 
-(IBM3 not yet implemented), `target.sentence` is the sentence in the language we want to translate _from_,
+(IBM3 and IBM4 not yet implemented), `target.sentence` is the sentence in the language we want to translate _from_,
 and `senlength.model`, `language.model` are the sentence-length and language models described
 previously in the noisy channel section. See `?decode.IBM2` for how they should be specified.
 If `senlength.model` or `language.model` aren't specified, they have defaults:
@@ -97,7 +96,7 @@ See `?evaluate` for more details.
 
 ## Help
 
-See `?IBM1`, `?IBM2`, `?IBM3`, `?decode.IBM1`, `?decode.IBM2`, `?evaluate` for more details.
+See `?IBM1`, `?IBM2`, `?IBM3`, `?IBM4`, `?decode.IBM1`, `?decode.IBM2`, `?evaluate` for more details.
 
 ## Sources
 

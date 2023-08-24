@@ -65,6 +65,7 @@ IBM3(
 \item{perplexity}{Final likelihood/perplexity value.}
 \item{time_elapsed}{Time in minutes the algorithm ran for.}
 \item{corpus}{data frame containing the target and source sentences and their lengths}
+\item{prev_best_aligns}{list containing best alignments (i.e. "viterbi" alignments) for each target sentence}
 }
 \description{
 The third SMT model from Brown et al. (1993). Note that, unlike IBM1 and IBM2 functions,
@@ -80,10 +81,10 @@ ENFR = readr::read_tsv(file=unz(temp,"fra.txt"),col_names=c("en","fr","details")
 unlink(temp);
 
 # a bit of pre-processing
-e = tolower(stringr::str_squish(tm::removePunctuation(ENFR$en[1:200])));
-f = tolower(stringr::str_squish(tm::removePunctuation(ENFR$fr[1:200])));
+e = tolower(stringr::str_squish(tm::removePunctuation(ENFR$en[1:10000])));
+f = tolower(stringr::str_squish(tm::removePunctuation(ENFR$fr[1:10000])));
 
 # a model
-model = IBM3(e,f,maxiter=10, init.IBM1=10, init.IBM2=20)
+model = IBM3(target=e,source=f,maxiter=10, init.IBM1=10, init.IBM2=20)
 
 }

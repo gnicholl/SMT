@@ -5,51 +5,71 @@
 \title{IBM4 Model}
 \usage{
 IBM4(
-  e,
-  e_wordclass,
-  f,
-  f_wordclass,
-  maxiter = 5,
+  target,
+  source,
+  target_wordclass,
+  source_wordclass,
+  maxiter = 30,
   eps = 0.01,
   heuristic = TRUE,
   maxfert = 5,
-  init.IBM1 = 5,
-  init.IBM2 = 5,
-  init.IBM3 = 3,
-  sparse = FALSE,
-  fmatch = FALSE
+  init.IBM1 = 10,
+  init.IBM2 = 10,
+  init.IBM3 = 10,
+  init.tmatrix = NULL,
+  init.amatrix = NULL,
+  init.fmatrix = NULL,
+  init.dmatrix = NULL,
+  init.d1array = NULL,
+  init.dg1array = NULL,
+  init.p_null = NULL,
+  verbose = 0.5
 )
 }
 \arguments{
-\item{e}{vector of sentences in language we want to translate to}
+\item{target}{vector of sentences in language we want to translate to. Function assumes sentences are space-delimited.}
 
-\item{e_wordclass}{named vector where names are each unique e word and values are the "class" of each e word numbered from 1 to n_e_class where n_e_class is the total number of word classes.}
+\item{source}{vector of sentences in language we want to translate from. Function assumes sentences are space-delimited.}
 
-\item{f}{vector of sentences in language we want to translate from}
+\item{target_wordclass}{named vector where names are each unique target word and values are the "class" of each target word numbered from 1 to n_target_class where n_target_class is the total number of target word classes.}
 
-\item{f_wordclass}{named vector where names are each unique f word and values are the "class" of each f word numbered from 1 to n_f_class where n_f_class is the total number of word classes.}
+\item{source_wordclass}{named vector where names are each unique source word and values are the "class" of each source word numbered from 1 to n_source_class where n_source_class is the total number of source word classes. (do NOT include \if{html}{\out{<NULL>}} token)}
 
-\item{maxiter}{max number of EM iterations allowed (default 5)}
+\item{maxiter}{max number of EM iterations allowed}
 
 \item{eps}{convergence criteria for perplexity (i.e. negative log-likelihood)}
 
-\item{heuristic}{If TRUE (default) use a heuristic hill-climbing algorithm to find most likely alignments. If FALSE, search over all alignments (not recommended unless only looking at small sentences.)}
+\item{heuristic}{If TRUE (default) use a heuristic hill-climbing algorithm to find most likely alignments. If FALSE, search over all alignments (not recommended unless only looking at short sentences). Sentences that are length 3 or smaller with always search over all alignments, even if heuristic=TRUE.}
 
-\item{maxfert}{Maximum number of e words ("fertility") which an f word is allowed to be mapped to. The default is 5. In practice fertility tends to be small, so this number should normally be sufficient.}
+\item{maxfert}{Maximum number of e words ("fertility") to which an f word can be aligned. The default is 5.}
 
-\item{init.IBM1}{number of iterations (integer>=0) of IBM1 to perform to initialize IBM2 algorithm (default 5)}
+\item{init.IBM1}{number of iterations (integer>=0) of IBM1 to perform to initialize IBM2 algorithm}
 
-\item{init.IBM2}{number of iterations (integer>=0) of IBM2 to perform to initialize IBM3 algorithm (default 5)}
+\item{init.IBM2}{number of iterations (integer>=0) of IBM2 to perform to initialize IBM3 algorithm}
 
-\item{init.IBM3}{number of iterations (integer>=0) of IBM3 to perform to initialize IBM4 algorithm (default 3)}
+\item{init.IBM3}{number of iterations (integer>=0) of IBM3 to perform to initialize IBM4 algorithm}
 
-\item{sparse}{If TRUE, uses sparse matrices from Matrix package (default FALSE).}
+\item{init.tmatrix}{tmatrix from a previous estimation. Used to initialize IBM1 (if \code{init.IBM1}>0), IBM2 (if \code{init.IBM2} >0), or IBM3 otherwise. If not provided, algorithm starts with uniform probabilities.}
+
+\item{init.amatrix}{amatrix from a previous estimation. Used to initialize IBM2 if \code{init.IBM2} >0. If not provided, algorithm starts with uniform probabilities.}
+
+\item{init.fmatrix}{fmatrix from a previous estimation. Used to initialize IBM3. If not provided, algorithm starts with uniform probabilities.}
+
+\item{init.dmatrix}{dmatrix from a previous estimation. Used to initialize IBM3. If not provided, algorithm starts with uniform probabilities.}
+
+\item{init.d1array}{d1array from a previous estimation. Used to initialize IBM4. If not provided, algorithm starts with uniform probabilities.}
+
+\item{init.dg1array}{dg1array from a previous estimation. Used to initialize IBM4. If not provided, algorithm starts with uniform probabilities.}
+
+\item{init.p_null}{p_null  from a previous estimation. Used to initialize IBM3. If not provided, algorithm starts with \code{p_null=0.5}.}
+
+\item{verbose}{If >=1, shows progress bar which updates every \code{verbose} steps, plus a summary when each iteration is complete. If 0.5 (default), only shows the summary without progress bars. If 0, shows nothing.}
 }
 \value{
-\item{tmatrix}{Matrix of translation probabilities (cols are words from e, rows are words from f). If sparse=TRUE, tmatrix will be a sparseMatrix from the Matrix package, and will generally take up substantially less memory.}
-\item{d1}{Array of relative distortion probabilities for the first word in a cept.}
-\item{dg1}{Array of relative distortion probabilities for subsequent words in a cept.}
-\item{fertmatrix}{Matrix of fertility probabilities.}
+\item{tmatrix}{Environment object containing translation probabilities for target-source word pairs. E.g. tmatrix$go$va (equivalently, tmatrix[\link{"go"}][\link{"va"}]) gives the probability of target="go" given source="va".}
+\item{d1array}{An array}
+\item{dg1array}{An array}
+\item{fmatrix}{Environment object containing vectors of fertility probabilities for each source word. E.g. fmatrix[\link{"va"}][1] is probability that "va" is aligned with 0 words. fmatrix[\link{"va"}][3] is probability "va" is aligned with 2 words. Each vector is length \code{maxfert+1}.}
 \item{p_null}{Probability of NULL token insertion.}
 \item{numiter}{Number of iterations}
 \item{maxiter}{As above}
@@ -57,9 +77,14 @@ IBM4(
 \item{converged}{TRUE if algorithm stopped once eps criteria met. FALSE otherwise.}
 \item{perplexity}{Final likelihood/perplexity value.}
 \item{time_elapsed}{Time in minutes the algorithm ran for.}
+\item{corpus}{data frame containing the target and source sentences and their lengths}
+\item{prev_best_aligns}{list containing best alignments (i.e. "viterbi" alignments) for each target sentence}
 }
 \description{
-The fourth SMT model from Brown et al. (1993)
+The fourth SMT model from Brown et al. (1993). Note that, unlike IBM1 and IBM2 functions,
+NULL insertion is always assumed for IBM3 and 4, and cannot be turned off. Note also that I use
+the basic hill climbing algorithm, and do not use pegging to increase the number
+of alignments considered.
 }
 \examples{
 # download english-french sentence pairs
@@ -69,37 +94,19 @@ ENFR = readr::read_tsv(file=unz(temp,"fra.txt"),col_names=c("en","fr","details")
 unlink(temp);
 
 # a bit of pre-processing
-e = tolower(stringr::str_squish(tm::removePunctuation(ENFR$en[1:200])));
-f = tolower(stringr::str_squish(tm::removePunctuation(ENFR$fr[1:200])));
-e_all = unique(unlist(stringr::str_split(e, pattern=" ")))
-f_all = unique(unlist(stringr::str_split(f, pattern=" ")))
+e = tolower(stringr::str_squish(tm::removePunctuation(ENFR$en[1:10000])));
+f = tolower(stringr::str_squish(tm::removePunctuation(ENFR$fr[1:10000])));
 
-# get POS tagging models from udpipe package
-m_eng = udpipe::udpipe_download_model(language = "english-ewt")
-m_eng = udpipe::udpipe_load_model(m_eng)
-m_fr = udpipe::udpipe_download_model(language = "french-gsd")
-m_fr = udpipe::udpipe_load_model(m_fr)
+# don't use any word classes, i.e. word class is 1 for all words
+all_e_words = unique(unlist(lapply(X=e,FUN=function(s) unlist(stringr::str_split(s, " ")))))
+all_f_words = unique(unlist(lapply(X=f,FUN=function(s) unlist(stringr::str_split(s, " ")))))
+class1 = rep(1,length(all_e_words)); names(class1)=all_e_words
+class2 = rep(1,length(all_f_words)); names(class2)=all_f_words
 
-# annotate e and f words
-en_annotate = udpipe::udpipe_annotate(m_eng, x = e_all) \%>\%
-  as.data.frame() \%>\%
-  dplyr::select(-sentence)
-fr_annotate = udpipe::udpipe_annotate(m_fr, x = f_all) \%>\%
-  as.data.frame() \%>\%
-  dplyr::select(-sentence)
-
-# code nouns as 1, everything else (including missings) as 2
-ecl = as.numeric(en_annotate$upos=="NOUN")+1
-  names(ecl) = e_all
-  ecl[is.na(ecl)] = 2
-fcl = as.numeric(fr_annotate$upos=="NOUN")+1
-  names(fcl) = f_all
-  fcl[is.na(fcl)] = 2
-
-# run model
-model4 = IBM4(
-  e=e, e_wordclass=ecl, f=f, f_wordclass=fcl,
-  maxiter=10, init.IBM1=10, init.IBM2=20, init.IBM3=10
-)
+# a model
+model4 = IBM4(target=e,target_wordclass=class1,
+                source=f,source_wordclass=class2,
+                maxiter=5, init.IBM1=10, init.IBM2=10, init.IBM3=2,
+                verbose=100)
 
 }
