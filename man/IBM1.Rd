@@ -38,6 +38,7 @@ IBM1(
 \item{perplexity}{Final likelihood/perplexity value.}
 \item{time_elapsed}{Time in minutes the algorithm ran for.}
 \item{corpus}{data frame containing the target and source sentences and their lengths}
+\item{best_alignments}{list containing best alignments (i.e. "viterbi" alignments) for each target sentence}
 }
 \description{
 The simplest SMT model from Brown et al. (1993)

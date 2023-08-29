@@ -19,6 +19,7 @@
 #'    \item{perplexity}{Final likelihood/perplexity value.}
 #'    \item{time_elapsed}{Time in minutes the algorithm ran for.}
 #'    \item{corpus}{data frame containing the target and source sentences and their lengths}
+#'    \item{best_alignments}{list containing best alignments (i.e. "viterbi" alignments) for each target sentence}
 #' @examples
 #' # download english-french sentence pairs
 #' temp = tempfile()
@@ -177,6 +178,8 @@ IBM1 = function(target,source,maxiter=30,eps=0.01,add.null.token=TRUE,init.tmatr
     iter = iter + 1
 
   } # end while
+
+  # return object
   corpus = data.frame(target, source, target_lengths, source_lengths)
   retobj = list(
     "tmatrix"=t_e_f,
@@ -189,6 +192,7 @@ IBM1 = function(target,source,maxiter=30,eps=0.01,add.null.token=TRUE,init.tmatr
     "corpus"=corpus
   )
   class(retobj) = "IBM1"
+  retobj$best_alignments = lapply(X=1:n,FUN=function(s) viterbi_align(retobj,e_sentences[[s]],f_sentences[[s]])  )
   return(retobj)
 
 } # end function IBM1

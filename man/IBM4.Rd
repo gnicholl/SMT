@@ -7,8 +7,8 @@
 IBM4(
   target,
   source,
-  target_wordclass,
-  source_wordclass,
+  target_wordclass = NULL,
+  source_wordclass = NULL,
   maxiter = 30,
   eps = 0.01,
   heuristic = TRUE,
@@ -31,9 +31,9 @@ IBM4(
 
 \item{source}{vector of sentences in language we want to translate from. Function assumes sentences are space-delimited.}
 
-\item{target_wordclass}{named vector where names are each unique target word and values are the "class" of each target word numbered from 1 to n_target_class where n_target_class is the total number of target word classes.}
+\item{target_wordclass}{named vector where names are each unique target word and values are the "class" of each target word numbered from 1 to n_target_class where n_target_class is the total number of target word classes. If not provided, assumes all words in the same class.}
 
-\item{source_wordclass}{named vector where names are each unique source word and values are the "class" of each source word numbered from 1 to n_source_class where n_source_class is the total number of source word classes. (do NOT include \if{html}{\out{<NULL>}} token)}
+\item{source_wordclass}{named vector where names are each unique source word and values are the "class" of each source word numbered from 1 to n_source_class where n_source_class is the total number of source word classes. (do NOT include \if{html}{\out{<NULL>}} token). If not provided, assumes all words in the same class.}
 
 \item{maxiter}{max number of EM iterations allowed}
 
@@ -78,7 +78,7 @@ IBM4(
 \item{perplexity}{Final likelihood/perplexity value.}
 \item{time_elapsed}{Time in minutes the algorithm ran for.}
 \item{corpus}{data frame containing the target and source sentences and their lengths}
-\item{prev_best_aligns}{list containing best alignments (i.e. "viterbi" alignments) for each target sentence}
+\item{best_alignments}{list containing best alignments (i.e. "viterbi" alignments) for each target sentence}
 }
 \description{
 The fourth SMT model from Brown et al. (1993). Note that, unlike IBM1 and IBM2 functions,

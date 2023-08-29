@@ -7,9 +7,9 @@
 #' the basic hill climbing algorithm, and do not use pegging to increase the number
 #' of alignments considered.
 #' @param target vector of sentences in language we want to translate to. Function assumes sentences are space-delimited.
-#' @param target_wordclass named vector where names are each unique target word and values are the "class" of each target word numbered from 1 to n_target_class where n_target_class is the total number of target word classes.
+#' @param target_wordclass named vector where names are each unique target word and values are the "class" of each target word numbered from 1 to n_target_class where n_target_class is the total number of target word classes. If not provided, assumes all words in the same class.
 #' @param source vector of sentences in language we want to translate from. Function assumes sentences are space-delimited.
-#' @param source_wordclass named vector where names are each unique source word and values are the "class" of each source word numbered from 1 to n_source_class where n_source_class is the total number of source word classes. (do NOT include <NULL> token)
+#' @param source_wordclass named vector where names are each unique source word and values are the "class" of each source word numbered from 1 to n_source_class where n_source_class is the total number of source word classes. (do NOT include <NULL> token). If not provided, assumes all words in the same class.
 #' @param maxiter max number of EM iterations allowed
 #' @param eps convergence criteria for perplexity (i.e. negative log-likelihood)
 #' @param heuristic If TRUE (default) use a heuristic hill-climbing algorithm to find most likely alignments. If FALSE, search over all alignments (not recommended unless only looking at short sentences). Sentences that are length 3 or smaller with always search over all alignments, even if heuristic=TRUE.
@@ -38,7 +38,7 @@
 #'    \item{perplexity}{Final likelihood/perplexity value.}
 #'    \item{time_elapsed}{Time in minutes the algorithm ran for.}
 #'    \item{corpus}{data frame containing the target and source sentences and their lengths}
-#'    \item{prev_best_aligns}{list containing best alignments (i.e. "viterbi" alignments) for each target sentence}
+#'    \item{best_alignments}{list containing best alignments (i.e. "viterbi" alignments) for each target sentence}
 #' @examples
 #' # download english-french sentence pairs
 #' temp = tempfile()
@@ -64,7 +64,7 @@
 #'
 #' @import progress
 #' @export
-IBM4 = function(target, source, target_wordclass, source_wordclass, maxiter=30, eps=0.01, heuristic=TRUE, maxfert=5,
+IBM4 = function(target, source, target_wordclass=NULL, source_wordclass=NULL, maxiter=30, eps=0.01, heuristic=TRUE, maxfert=5,
                 init.IBM1=10, init.IBM2=10, init.IBM3=10,
                 init.tmatrix=NULL, init.amatrix=NULL, init.fmatrix=NULL, init.dmatrix=NULL,
                 init.d1array=NULL, init.dg1array=NULL, init.p_null=NULL,
@@ -115,40 +115,6 @@ IBM4 = function(target, source, target_wordclass, source_wordclass, maxiter=30, 
       }
     }
     return(unique(N))
-  }
-  viterbi_IBM2 = function(e_sen,f_sen) {
-    le = length(e_sen)
-    lf = length(f_sen)
-    a = rep(NA,le)
-    for (j in 1:le) {
-      a[j] = which.max(sapply(X=1:lf, FUN=function(i) out_IBM2$tmatrix[[e_sen[j]]][[f_sen[i]]] * out_IBM2$amatrix[[le]][[lf]][j,i] ))
-    }
-    return(a)
-  }
-  pr_IBM3 = function(a, e_sen, f_sen) {
-    le = length(e_sen); lf = length(f_sen)
-    f_aj = f_sen[a] # f word to which each e word aligned
-    phi = sapply(X=1:lf, FUN=function(i) sum(a==i))  # fertilities
-
-    # NULL insertion
-    prob_null = choose(le-phi[1],phi[1]) * ( p_null^phi[1] ) * ( max(1 - p_null,0.0000001)^(le - 2*phi[1]) )
-    if (prob_null==0) return(0)
-
-    # fertility
-    fert = sapply(  X=2:lf, FUN=function(i) fertmatrix[[f_sen[i]]][min(phi[i],maxfert)+1] )
-    prob_fert = prod( factorial(phi[2:lf]) * fert )
-    if (prob_fert==0) return(0)
-
-    # translation
-    prob_t = prod(sapply(X=1:le, FUN=function(j) t_e_f[[ e_sen[j] ]][[ f_aj[j] ]] ))
-    if (prob_t==0) return(0)
-
-    # distortion
-    prob_d = prod(sapply(X=1:le, FUN=function(j) dprob[[le]][[lf]][j,a[j]] ))
-    if (prob_d==0) return(0)
-
-    # output
-    return(as.numeric(prob_null*prob_fert*prob_t*prob_d))
   }
   pr_IBM4 = function(a, e_sen, f_sen) {
     le = length(e_sen); lf = length(f_sen)
@@ -258,7 +224,7 @@ IBM4 = function(target, source, target_wordclass, source_wordclass, maxiter=30, 
       return(sample_IBM4_method2(e_sen, f_sen, s))
     }
   }
-  prev_best_aligns = out_IBM3$prev_best_aligns
+  prev_best_aligns = out_IBM3$best_alignments
   sample_IBM4_method1 = function(e_sen, f_sen, s) {
     a_0 = prev_best_aligns[[s]]
     a_n = hillclimb(a_0,e_sen,f_sen)
@@ -278,6 +244,16 @@ IBM4 = function(target, source, target_wordclass, source_wordclass, maxiter=30, 
   e_allwords = unique(unlist(stringr::str_split(e, pattern=" ")))
   f_allwords = unique(unlist(stringr::str_split(f, pattern=" ")))
   n = length(e_sentences); n_eword = length(e_allwords); n_fword = length(f_allwords)
+
+  # if classes missing, assume all are same class
+  if (is.null(target_wordclass)) {
+    target_wordclass = rep(1,length(e_allwords))
+    names(target_wordclass)=e_allwords
+  }
+  if (is.null(source_wordclass)) {
+    source_wordclass = rep(1,length(f_allwords))
+    names(source_wordclass)=f_allwords
+  }
 
   # initialize t matrix and counts
   t_e_f = out_IBM3$tmatrix
@@ -533,7 +509,7 @@ IBM4 = function(target, source, target_wordclass, source_wordclass, maxiter=30, 
     "perplexity"=total_perplex,
     "time_elapsed"=time_elapsed,
     "corpus"=out_IBM3$corpus,
-    "prev_best_aligns"=prev_best_aligns
+    "best_alignments"=prev_best_aligns
   )
   class(retobj) = "IBM4"
   return(retobj)

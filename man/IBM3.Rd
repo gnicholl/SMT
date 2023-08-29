@@ -65,7 +65,7 @@ IBM3(
 \item{perplexity}{Final likelihood/perplexity value.}
 \item{time_elapsed}{Time in minutes the algorithm ran for.}
 \item{corpus}{data frame containing the target and source sentences and their lengths}
-\item{prev_best_aligns}{list containing best alignments (i.e. "viterbi" alignments) for each target sentence}
+\item{best_alignments}{list containing best alignments (i.e. "viterbi" alignments) for each target sentence}
 }
 \description{
 The third SMT model from Brown et al. (1993). Note that, unlike IBM1 and IBM2 functions,

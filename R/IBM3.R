@@ -33,7 +33,7 @@
 #'    \item{perplexity}{Final likelihood/perplexity value.}
 #'    \item{time_elapsed}{Time in minutes the algorithm ran for.}
 #'    \item{corpus}{data frame containing the target and source sentences and their lengths}
-#'    \item{prev_best_aligns}{list containing best alignments (i.e. "viterbi" alignments) for each target sentence}
+#'    \item{best_alignments}{list containing best alignments (i.e. "viterbi" alignments) for each target sentence}
 #' @examples
 #' # download english-french sentence pairs
 #' temp = tempfile()
@@ -99,15 +99,6 @@ IBM3 = function(target, source, maxiter=30, eps=0.01, heuristic=TRUE, maxfert=5,
     }
     return(unique(N))
   }
-  viterbi_IBM2 = function(e_sen,f_sen) {
-    le = length(e_sen)
-    lf = length(f_sen)
-    a = rep(NA,le)
-    for (j in 1:le) {
-      a[j] = which.max(sapply(X=1:lf, FUN=function(i) out_IBM2$tmatrix[[e_sen[j]]][[f_sen[i]]] * out_IBM2$amatrix[[le]][[lf]][j,i] ))
-    }
-    return(a)
-  }
   pr_IBM3 = function(a, e_sen, f_sen) {
     le = length(e_sen); lf = length(f_sen)
     f_aj = f_sen[a] # f word to which each e word aligned
@@ -168,17 +159,11 @@ IBM3 = function(target, source, maxiter=30, eps=0.01, heuristic=TRUE, maxfert=5,
       return(sample_IBM3_method2(e_sen, f_sen, s))
     }
   }
-  prev_best_aligns = list()
+  prev_best_aligns = out_IBM2$best_alignments
   sample_IBM3_method1 = function(e_sen, f_sen, s) {
-    if (length(prev_best_aligns) < s) {
-      a_0 = viterbi_IBM2(e_sen,f_sen)
-      a_n = hillclimb(a_0,e_sen,f_sen)
-      prev_best_aligns[[s]] <<- a_n
-    } else {
       a_0 = prev_best_aligns[[s]]
       a_n = hillclimb(a_0,e_sen,f_sen)
       prev_best_aligns[[s]] <<- a_n
-    }
     return(neighbourhood(a_n,length(e_sen),length(f_sen)))
   }
   sample_IBM3_method2 = function(e_sen, f_sen, s) {
@@ -433,7 +418,7 @@ IBM3 = function(target, source, maxiter=30, eps=0.01, heuristic=TRUE, maxfert=5,
     "perplexity"=total_perplex,
     "time_elapsed"=time_elapsed,
     "corpus"=out_IBM2$corpus,
-    "prev_best_aligns"=prev_best_aligns
+    "best_alignments"=prev_best_aligns
   )
   class(retobj) = "IBM3"
   return(retobj)
