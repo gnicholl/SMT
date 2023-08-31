@@ -2,6 +2,7 @@
 
 S3method(decode,IBM1)
 S3method(decode,IBM2)
+S3method(decode,phrase_table)
 export(IBM1)
 export(IBM2)
 export(IBM3)

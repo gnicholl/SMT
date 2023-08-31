@@ -139,6 +139,9 @@ phrase_extract = function(align_points,l1,l2) {
 #' For each sentence, symmetrizes the best (viterbi) alignments
 #' and extracts phrases based on the alignments. Produces the phrase translation
 #' probability table as an R environment object.
+#' @return
+#'    \item{phrase_table}{Environment object containing phrase translation probabilities.}
+#'    \item{corpus}{Data frame containing the corpus used to train the models.}
 #' @examples
 #'  # data
 #'  temp = tempfile()
@@ -162,16 +165,16 @@ phrase_extract = function(align_points,l1,l2) {
 #'  phtable = build_phrase_table(model1,model2)
 #'
 #'  # e.g. phrase probabilities for e phrase "calm down"
-#'  phtable[["calm down"]][["calmetoi"]]
-#'  phtable[["calm down"]][["calmezvous"]]
-#'  phtable[["calm down"]][["du calme"]]
-#'  phtable[["calm down"]][["tranquille"]]
+#'  phtable$phrase_table[["calm down"]][["calmetoi"]]
+#'  phtable$phrase_table[["calm down"]][["calmezvous"]]
+#'  phtable$phrase_table[["calm down"]][["du calme"]]
+#'  phtable$phrase_table[["calm down"]][["tranquille"]]
 #'
 #'  # we can get phrase table in opposite direction by reversing model order:
 #'  phtable2 = build_phrase_table(model2,model1)
-#'  phtable[["calmetoi"]][["calm down"]]
-#'  phtable[["calmetoi"]][["chill out"]]
-#'  phtable[["calmetoi"]][["relax"]]
+#'  phtable$phrase_table[["calmetoi"]][["calm down"]]
+#'  phtable$phrase_table[["calmetoi"]][["chill out"]]
+#'  phtable$phrase_table[["calmetoi"]][["relax"]]
 #' @export
 build_phrase_table = function(model1, model2, ondisk=FALSE) {
 
@@ -206,7 +209,15 @@ build_phrase_table = function(model1, model2, ondisk=FALSE) {
       rm("<TOTAL>",envir=phrase_table[[e]])
     }
 
-    return(phrase_table)
+
+    retobj = list()
+    retobj$phrase_table = phrase_table
+    retobj$corpus = data.frame(target=model2$corpus$target,
+                               source=model1$corpus$target,
+                               target_lengths=model2$corpus$target_lengths,
+                               source_lengths=model1$corpus$target_lengths)
+    class(retobj) = "phrase_table"
+    return(retobj)
   }
 }
 

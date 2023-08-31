@@ -6,6 +6,10 @@
 \usage{
 build_phrase_table(model1, model2, ondisk = FALSE)
 }
+\value{
+\item{phrase_table}{Environment object containing phrase translation probabilities.}
+\item{corpus}{Data frame containing the corpus used to train the models.}
+}
 \description{
 Takes two models (any of IBM1 through IBM4) translating in opposite directions.
 For each sentence, symmetrizes the best (viterbi) alignments
@@ -35,14 +39,14 @@ probability table as an R environment object.
  phtable = build_phrase_table(model1,model2)
 
  # e.g. phrase probabilities for e phrase "calm down"
- phtable[["calm down"]][["calmetoi"]]
- phtable[["calm down"]][["calmezvous"]]
- phtable[["calm down"]][["du calme"]]
- phtable[["calm down"]][["tranquille"]]
+ phtable$phrase_table[["calm down"]][["calmetoi"]]
+ phtable$phrase_table[["calm down"]][["calmezvous"]]
+ phtable$phrase_table[["calm down"]][["du calme"]]
+ phtable$phrase_table[["calm down"]][["tranquille"]]
 
  # we can get phrase table in opposite direction by reversing model order:
  phtable2 = build_phrase_table(model2,model1)
- phtable[["calmetoi"]][["calm down"]]
- phtable[["calmetoi"]][["chill out"]]
- phtable[["calmetoi"]][["relax"]]
+ phtable$phrase_table[["calmetoi"]][["calm down"]]
+ phtable$phrase_table[["calmetoi"]][["chill out"]]
+ phtable$phrase_table[["calmetoi"]][["relax"]]
 }

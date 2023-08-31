@@ -9,6 +9,6 @@ decode(object, ...)
 \description{
 This generic function translates ("decodes") a given sentence in one language
 to a sentence in the output language given the model estimates from \code{object}.
-Currently supports decoding based on \code{IBM1} and \code{IBM2}. See \code{?decode.IBM1}
-and \code{?decode.IBM2}.
+Currently supports decoding based on \code{IBM1}, \code{IBM2}, or phrase-based. See \code{?decode.IBM1},
+\code{?decode.IBM2}, \code{decode.phrase_table}.
 }
