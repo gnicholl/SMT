@@ -1,6 +1,6 @@
 # SMT: Statistical Machine Translation in R
 
-This R package implements the translation models IBM1, IBM2, IBM3, and IBM4 from `Brown et al (1993)`. While SMT methods have largely been overtaken by neural network-based methods, the IBM models remain historically important and are still used in conjunction with neural methods thanks to their word-alignment capabilities.
+This R package implements the translation models IBM1, IBM2, IBM3, and IBM4 from `Brown et al (1993)` as well as phrase-based translation. While SMT methods have largely been overtaken by neural network-based methods, the IBM models remain historically important and are still used in conjunction with neural methods thanks to their word-alignment capabilities.
 
 ## Noisy-Channel Model
 
@@ -10,7 +10,7 @@ $$
 \mathbf{e} = \text{argmax}_{\mathbf{e}} \Pr(\mathbf{e} | \mathbf{f}) = \text{argmax} _{\mathbf{e}} \Pr(\mathbf{f} | \mathbf{e}) \Pr(\mathbf{e})
 $$
 
-where $\Pr(\mathbf{f} | \mathbf{e})$ is the translation model (here estimated using the IBM models) and $\Pr(\mathbf{e})$ is the language model (here estimated using the `kgrams` R package).
+where $\Pr(\mathbf{f} | \mathbf{e})$ is the translation model (which will be estimated using the IBM models or phrase tables) and $\Pr(\mathbf{e})$ is the language model (here estimated using the `kgrams` R package).
 
 Actually, there is one piece missing. The translation and language models we will consider implicitly treat $n$, the length of sentence $\mathbf{e}$, as given. But, we don't know in advance what length the sentence should be when we are translating--i.e. $n$ is a random variable! We thus add the sentence length model $\Pr(n | m)$, assuming that the length of $\mathbf{e}$ depends only on the length of $\mathbf{f}$. Then:
 
@@ -22,9 +22,9 @@ In the decoding algorithm of `Wang & Waibel (1998)`, they state that they model 
 
 To summarise:
 
-- $\Pr(\mathbf{f} | \mathbf{e}, n, m)$: translation probability estimated using IBM models implemented in this package
-- $\Pr(\mathbf{e} | n)$: language model estimated using ngrams from the `kgrams` R package
-- $\Pr(n | m)$: sentence length model, which by default will be estimated using the built-in `glm` function to run a poisson regression
+- $\Pr(\mathbf{f} | \mathbf{e}, n, m)$: translation probability estimated using IBM models or phrase tables; implemented in this package
+- $\Pr(\mathbf{e} | n)$: language model estimated using ngrams; implemented in the `kgrams` R package
+- $\Pr(n | m)$: sentence length model; by default estimated using the built-in `glm` function to run a simple poisson regression
 
 ## Estimating the IBM Models
 
@@ -52,12 +52,33 @@ You can specify the number of iterations for the initialization, e.g.,
 arguments to 0 and use results from previous model estimations instead. 
 See help pages for more details.
 
+## Estimating Phrase Tables
+
+Phrase-based translation traditionally takes the following steps for estimating phrase probability tables (see `Koehn (2009)`):
+
+1. Estimate IBM models in both directions (e.g. English-to-French _and_ French-to-English)
+2. Combine alignments from the two models to obtain a "symmetrized" set of sentence alignments
+3. Extract phrases using the symmetrized alignments
+4. Estimate phrase probabilities based on the frequency with which each phrase occurs
+
+Steps 2 to 4 are handled by the `build_phrase_table` function. For example:
+
+```
+# estimate models in both directions
+model3_ftoe = IBM3(target=e,source=f,maxiter=5, init.IBM1=15, init.IBM2=15,  verbose=100)
+model3_etof = IBM3(target=f,source=e,maxiter=5, init.IBM1=15, init.IBM2=15,  verbose=100)
+
+# extract phrases from the IBM models and compute phrase probabilities
+phtable = build_phrase_table(model3_ftoe, model3_etof)
+```
+
+
 ## Data Types
 
 These methods rely on being able to take a word or words and look up the corresponding probability in a table.
 To do this fast I use R environment objects, which are the closest equivalent to python
 dictionaries available in base R. These use hashing, making the table lookups
-O(1) time. For example, each model produces a `tmatrix`, which gives the translation
+O(1) time. For example, each IBM model produces a `tmatrix`, which gives the translation
 probability of an output word given an input word. E.g., `tmatrix[["fish"]][["poisson"]]`
 (or equivalently `tmatrix$fish$poisson`) gives the probability that "fish" in English is the proper translation of "poisson" in French.
 
@@ -73,8 +94,8 @@ will also affect `tmatrix1`.
 
 To generate most likely translations for a given sentence in language f to language e, 
 use the generic method `decode(object,target.sentence,senlength.model,language.model)`
-where `object` is an IBM1 or IBM2 object returned from one of the respective functions 
-(IBM3 and IBM4 not yet implemented), `target.sentence` is the sentence in the language we want to translate _from_,
+where `object` is an object returned from one `IBM1()`, `IBM2()`, or `build_phrase_table()`;
+`target.sentence` is the sentence in the language we want to translate _from_,
 and `senlength.model`, `language.model` are the sentence-length and language models described
 previously in the noisy channel section. See `?decode.IBM2` for how they should be specified.
 If `senlength.model` or `language.model` aren't specified, they have defaults:
@@ -84,7 +105,8 @@ If `senlength.model` or `language.model` aren't specified, they have defaults:
 
 It is computationally infeasible to consider all
 possible translations while decoding, so in practice we rely on heuristic algorithms.
-Here I implement Algorithm 1 of `Wang & Waibel (1998)`, which is a stack decoding approach. 
+For IBM1 and IBM2 I implement Algorithm 1 of `Wang & Waibel (1998)`, which is a stack decoding approach. 
+For phrase translation I implement the methods described in `Koehn (2009)` chapter 6.
 
 ## Evaluate
 
@@ -96,7 +118,7 @@ See `?evaluate` for more details.
 
 ## Help
 
-See `?IBM1`, `?IBM2`, `?IBM3`, `?IBM4`, `?decode.IBM1`, `?decode.IBM2`, `?evaluate` for more details.
+See `?IBM1`, `?IBM2`, `?IBM3`, `?IBM4`, `?build_phrase_table`, `?decode.IBM1`, `?decode.IBM2`, `?decode.phrase_table`, `?evaluate` for more details.
 
 ## Sources
 
